@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="ja">
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Speaker Xover (2-way)</title>
-<style>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Speaker Xover (2-way)</title>
+  <style>
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:16px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
   label{display:flex;flex-direction:column;font-size:12px}
@@ -15,7 +16,9 @@
   fieldset.toggles label{display:flex;flex-direction:row;align-items:center;gap:6px}
   #results{white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px;margin-top:12px}
   canvas{background:#fff;border-radius:8px;max-width:980px}
-</style>
+  </style>
+</head>
+<body>
 <h1>スピーカーネットワーク設計（2‑way）</h1>
 <div class="row">
   <label>システム
@@ -217,4 +220,5 @@
   el('calc').addEventListener('click', run);
   run();
 </script>
+</body>
 </html>
