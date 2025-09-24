@@ -74,6 +74,7 @@
     <label><input type="checkbox" id="show-sum" checked> Sum</label>
     <label><input type="checkbox" id="show-snapped" checked> スナップ後（実用値）</label>
     <label><input type="checkbox" id="show-delta"> 差分（理想−スナップ後）</label>
+    <label><input type="checkbox" id="show-imp" checked> インピーダンスZ</label>
   </fieldset>
 </div>
 
@@ -89,6 +90,33 @@
   function lpad(z,att){const A=dbToRatio(att);if(A<=1)return{Rs:0,Rp:Infinity,Zin:z,A:1};const Rs=z*(A-1)/A;const Rp=z*A/(A-1);const Zin=Rs+1/(1/Rp+1/z);return{Rs,Rp,Zin,A}}
   function snapR(target,tol=0.05){let best=null;const push=(val,parts)=>{const err=Math.abs(val-target)/target;if(err<=tol&&(!best||err<best.err))best={val,err,parts}};for(const r of takman)push(r,[`${r}Ω`]);for(const r1 of takman)for(const r2 of takman)push(r1+r2,[`${r1}Ω+${r2}Ω`]);for(const r1 of takman)for(const r2 of takman){const v=1/(1/r1+1/r2);push(v,[`${r1}Ω||${r2}Ω`])}return best}
   function estimateZobel(zNom,fc){const Re=0.8*zNom;const Le=zNom/(2*Math.PI*fc*5);const Rz=Re;const Cz=Le/(Rz*Rz);return{Re,Le,Rz,Cz}}
+  // 簡易インピーダンスモデル（名目Z + Zobel + L-padの影響）
+  function calcImpedanceCurve(freq, zNom, useZobel, zobel, lpadMode, lpVals){
+    const twoPi = 2*Math.PI;
+    return freq.map(function(f){
+      // Woofer側: 名目直列抵抗 zNom を基礎に、Zobel(R-C直列の並列)を付加
+      let Zw = zNom; // 実装簡易化：上昇分は無視し、Zobel適用時にやや低下させる
+      if(useZobel && zobel){
+        const Rz = zobel.Rz;
+        const Cz = zobel.Cz;
+        // 簡略: 並列合成の実数近似（Cが働く帯域で若干低下）。fc付近で効果が高い。
+        const w = twoPi*f;
+        const w0 = twoPi*2000; // 目安周波数
+        const weight = 1/(1 + Math.pow(w/w0,2));
+        Zw = zNom * (1 - 0.15*weight); // ざっくり15%低下モデル
+      }
+      // Tweeter側: L-pad（自動時）は入力Zが名目に近い
+      let Zt = zNom;
+      if(lpadMode==='auto' && lpVals){
+        const Rs = lpVals.Rs, Rp = isFinite(lpVals.Rp)? lpVals.Rp : 1e9;
+        const Zin = Rs + 1/(1/Rp + 1/zNom);
+        Zt = Zin;
+      }
+      // 合成Z（並列）
+      const Zsys = 1/(1/Zw + 1/Zt);
+      return Zsys;
+    });
+  }
   function autoPol(w,t){const evenW=(w==='LR2'||w==='LR4'||w==='Butterworth');const evenT=(t==='LR2'||t==='LR4'||t==='Butterworth');return (evenW&&evenT)?'invert':'normal'}
   function fmtOhm(x){return x===Infinity?'∞':(Math.round(x*100)/100).toFixed(2)+' Ω'}
   function fmtCap(c){return (c*1e6).toFixed(3)+' µF'}
@@ -189,6 +217,9 @@
     const sumIdealDb=freq.map((_,i)=> sumDb(wIdealDb[i], tIdealDb[i], invert));
     const sumSnapDb=freq.map((_,i)=> sumDb(wIdealDb[i], tSnapDb[i], invert));
     const deltaDb=freq.map((_,i)=> sumIdealDb[i]-sumSnapDb[i]);
+    // インピーダンス簡易計算（Zobel/L-padの影響を含む近似）
+    const impCurve = calcImpedanceCurve(freq, wz, (el('wzobel').value==='on'), zbl, lpadMode, lp);
+    // 現状はdBキャンバスにΩ軸は重ねず、UIでのZトグルは次コミットで別キャンバス表示に拡張予定
     draw2Way(freq,{ wIdeal:wIdealDb, tIdeal:tIdealDb, sumIdeal:sumIdealDb, wSnap:wIdealDb, tSnap:tSnapDb, sumSnap:sumSnapDb, delta:deltaDb },{ showWoo:el('show-woo').checked, showTwe:el('show-twe').checked, showSum:el('show-sum').checked, showSnapped:el('show-snapped').checked, showDelta:el('show-delta').checked });
     const slopeText = s => s==='LR4'? 'LR4（24 dB/oct）': s==='LR2'? 'LR2（12 dB/oct）' : s;
     const lines=[];
