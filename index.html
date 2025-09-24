@@ -239,9 +239,10 @@
     const lpadMode=el('tlpad').value;
     const needAtt=Math.max(0, tspl-systemSPL);
     const lp=(lpadMode==='auto')? lpad(tz, needAtt) : {Rs:0,Rp:Infinity,Zin:tz,A:1};
-    const RsSnap=(lpadMode==='auto'&&lp.Rs>0)? snapR(lp.Rs,0.05):null;
-    const RpSnap=(lpadMode==='auto'&&isFinite(lp.Rp))? snapR(lp.Rp,0.05):null;
-    const ZinSnap=(lpadMode==='auto'&&RsSnap&&RpSnap)? (RsSnap.val+1/(1/RpSnap.val+1/tz)) : lp.Zin;
+    // 古いsnapR関数の呼び出しを新しいfindOptimalResistorCombinationに置き換え
+    const RsSnap=(lpadMode==='auto'&&lp.Rs>0)? findOptimalResistorCombination(lp.Rs):null;
+    const RpSnap=(lpadMode==='auto'&&isFinite(lp.Rp))? findOptimalResistorCombination(lp.Rp):null;
+    const ZinSnap=(lpadMode==='auto'&&RsSnap&&RpSnap)? (RsSnap.value+1/(1/RpSnap.value+1/tz)) : lp.Zin;
     const zbl=(el('wzobel').value==='on')? estimateZobel(wz,fc):null;
     const freq=genFreq();
     const wMag=freq.map(f=> magLP(wtype,f,fc));
