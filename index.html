@@ -188,10 +188,32 @@
     lines.push('■ Zobel（Woofer補正）');
     if (zbl){ lines.push(`Rz = ${fmtOhm(zbl.Rz)}`); lines.push(`Cz = ${fmtCap(zbl.Cz)}（Re/Le内部推定）`); } else { lines.push('未適用'); }
     lines.push('');
-    const L1=wz/(2*Math.PI*fc), C1=1/(2*Math.PI*tz*fc);
-    lines.push('■ 参考（1次理想値の目安）');
-    lines.push(`Low-pass L(series)：${fmtInd(L1)}`);
-    lines.push(`High-pass C(series)：${fmtCap(C1)}`);
+    // フィルタ素子の理論値（暫定: LR2=一次×2, LR4=一次×4。Butterworth/Besselは当面LR2相当で出力）
+    const twoPi = 2*Math.PI;
+    const L1st_w = wz/(twoPi*fc);      // 1次LP L(series)
+    const C1st_w = 1/(twoPi*wz*fc);    // 1次LP C(shunt)
+    const C1st_t = 1/(twoPi*tz*fc);    // 1次HP C(series)
+    const L1st_t = tz/(twoPi*fc);      // 1次HP L(shunt)
+    function mapTypeToOrder(type){ return (type==='LR4')? 4 : 2; }
+    function hpPartsObj(type){
+      const order = mapTypeToOrder(type);
+      if(order===4){ return { C1:C1st_t, L1:L1st_t, C2:C1st_t, L2:L1st_t, note:'LR4（1次×4 近似）' }; }
+      return { C1:C1st_t, L1:L1st_t, C2:undefined, L2:undefined, note:(type==='LR2'?'LR2':'LR2相当（暫定）') };
+    }
+    function lpPartsObj(type){
+      const order = mapTypeToOrder(type);
+      if(order===4){ return { L1:L1st_w, C1:C1st_w, L2:L1st_w, C2:C1st_w, note:'LR4（1次×4 近似）' }; }
+      return { L1:L1st_w, C1:C1st_w, L2:undefined, C2:undefined, note:(type==='LR2'?'LR2':'LR2相当（暫定）') };
+    }
+    const hpPartsVals = hpPartsObj(ttype);
+    const lpPartsVals = lpPartsObj(wtype);
+    lines.push('■ HP（Tweeter）素子値（理論）');
+    lines.push(`C1(series)：${fmtCap(hpPartsVals.C1)}  ／  L1(shunt)：${fmtInd(hpPartsVals.L1)}${hpPartsVals.C2?'' : ''}`);
+    if(hpPartsVals.C2!==undefined) lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}  ／  L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
+    lines.push('');
+    lines.push('■ LP（Woofer）素子値（理論）');
+    lines.push(`L(series)：${fmtInd(lpPartsVals.L1)}  ／  C(shunt)：${fmtCap(lpPartsVals.C1)}`);
+    if(lpPartsVals.L2!==undefined) lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  ／  C2(shunt)：${fmtCap(lpPartsVals.C2)}  （${lpPartsVals.note}）`);
     el('results').textContent = lines.join('\n');
   }
   ['show-woo','show-twe','show-sum','show-snapped','show-delta'].forEach(function(id){ el(id).addEventListener('change', run); });
