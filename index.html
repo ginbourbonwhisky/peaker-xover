@@ -41,7 +41,7 @@
   </label>
 </div>
 
-<h3>ウーファー</h3>
+<h3>LP（Woofer）</h3>
 <div class="row">
   <label>Ω<input id="wz" type="number" value="8"></label>
   <label>dB<input id="wspl" type="number" value="90" step="0.1"></label>
@@ -53,7 +53,7 @@
   </label>
 </div>
 
-<h3>ツイーター</h3>
+<h3>HP（Tweeter）</h3>
 <div class="row">
   <label>Ω<input id="tz" type="number" value="8"></label>
   <label>dB<input id="tspl" type="number" value="98" step="0.1"></label>
@@ -118,7 +118,7 @@
     }
     return 1/Math.sqrt(1+x*x)
   }
-  function genFreq(){const arr=[];for(let p=Math.log10(20);p<=Math.log10(40000);p+=0.02){arr.push(10**p)}return arr}
+  function genFreq(){const arr=[];for(let p=Math.log10(20);p<=Math.log10(40000);p+=0.02){arr.push(Math.pow(10,p))}return arr}
   function wiringForHP(type){if(type==='LR4')return['C1(series)','L1(shunt)','C2(series)','L2(shunt)'];return['C(series)','L(shunt)']}
   function wiringForLP(type){if(type==='LR4')return['L1(series)','C1(shunt)','L2(series)','C2(shunt)'];return['L(series)','C(shunt)']}
   function formatWiringLine(prefix,parts,tail=''){return`${prefix} ${parts.map(p=>p).join(' → ')}${tail}`}
@@ -150,7 +150,7 @@
           plugins:{ legend:{ position:'bottom' } },
           scales:{
             x:{ type:'logarithmic', min:20, max:40000, ticks:{ callback:function(value){ return value; } }, title:{ display:true, text:'Hz' } },
-            y:{ title:{ display:true, text:'dB' }, suggestedMin:-50, suggestedMax:10 }
+            y:{ title:{ display:true, text:'dB' }, min:-40, max:40 }
           }
         }
       });
@@ -201,7 +201,7 @@
     lines.push(`・Zobel（Woofer補正）：${zbl? '使用（ON）':'未使用（OFF）'}`);
     lines.push(`・L-pad（Tweeter減衰）：${lpadMode==='auto'? '約−'+needAtt.toFixed(1)+' dB（定インピ）':'OFF'}`);
     lines.push('---\n');
-    lines.push('■ 配線順（概略）');
+    lines.push(`■ 配線順（概略）:   HP（Tweeter） ${slopeText(ttype)}  ｜  LP（Woofer） ${slopeText(wtype)}`);
     const hp=wiringForHP(ttype); const lpw=wiringForLP(wtype);
     lines.push(formatWiringLine('[入力(＋)] → HP：', hp, ' → L-pad(Rs→Rp) → Tweeter(＋)'));
     lines.push(formatWiringLine('           → LP：', lpw, ' → Woofer(＋) ／ Woofer端子＋−間に [Rz−Cz直列] を並列（Zobel）'));
@@ -228,7 +228,7 @@
     lines.push(`High-pass C(series)：${fmtCap(C1)}`);
     el('results').textContent = lines.join('\n');
   }
-  ['show-woo','show-twe','show-sum','show-snapped','show-delta'].forEach(id=>{ el(id).addEventListener('change', run); });
+  ['show-woo','show-twe','show-sum','show-snapped','show-delta'].forEach(function(id){ el(id).addEventListener('change', run); });
   el('calc').addEventListener('click', run);
   run();
 </script>
