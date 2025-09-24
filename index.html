@@ -72,8 +72,8 @@
     <label><input type="checkbox" id="show-woo" checked> Woofer</label>
     <label><input type="checkbox" id="show-twe" checked> Tweeter</label>
     <label><input type="checkbox" id="show-sum" checked> Sum</label>
-    <label><input type="checkbox" id="show-snapped" checked> Snapped</label>
-    <label><input type="checkbox" id="show-delta"> Delta</label>
+    <label><input type="checkbox" id="show-snapped" checked> スナップ後（実用値）</label>
+    <label><input type="checkbox" id="show-delta"> 差分（理想−スナップ後）</label>
   </fieldset>
 </div>
 
@@ -135,11 +135,11 @@
     if(toggles.showTwe)ds.push({label:'Tweeter',data:series.tIdeal,borderColor:'#06c',pointRadius:0});
     if(toggles.showSum)ds.push({label:'Sum',data:series.sumIdeal,borderColor:'#000',pointRadius:0});
     if(toggles.showSnapped){
-      if(toggles.showWoo)ds.push({label:'Woofer (Snapped)',data:series.wSnap,borderColor:'#f88',pointRadius:0,borderDash:[4,2]});
-      if(toggles.showTwe)ds.push({label:'Tweeter (Snapped)',data:series.tSnap,borderColor:'#8af',pointRadius:0,borderDash:[4,2]});
-      if(toggles.showSum)ds.push({label:'Sum (Snapped)',data:series.sumSnap,borderColor:'#666',pointRadius:0,borderDash:[4,2]});
+      if(toggles.showWoo)ds.push({label:'Woofer（スナップ後）',data:series.wSnap,borderColor:'#f88',pointRadius:0,borderDash:[4,2]});
+      if(toggles.showTwe)ds.push({label:'Tweeter（スナップ後）',data:series.tSnap,borderColor:'#8af',pointRadius:0,borderDash:[4,2]});
+      if(toggles.showSum)ds.push({label:'Sum（スナップ後）',data:series.sumSnap,borderColor:'#666',pointRadius:0,borderDash:[4,2]});
     }
-    if(toggles.showDelta){ ds.push({label:'Delta (Ideal - Snapped)',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
+    if(toggles.showDelta){ ds.push({label:'差分（理想−スナップ後）',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
     try {
       chart=new Chart(ctx,{
         type:'line',
