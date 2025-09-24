@@ -90,8 +90,31 @@
   function fmtOhm(x){return x===Infinity?'∞':(Math.round(x*100)/100).toFixed(2)+' Ω'}
   function fmtCap(c){return (c*1e6).toFixed(3)+' µF'}
   function fmtInd(l){return (l*1e3).toFixed(3)+' mH'}
-  function magLP(type,f,fc){const x=f/fc;if(type==='LR2'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='LR4'){return 1/Math.sqrt(1+Math.pow(x,8))}if(type==='Butterworth'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='Bessel'){const num=3;const den=Math.sqrt(x**4+3*x**2+3);return Math.min(1,num/den)}return 1/Math.sqrt(1+x*x)}
-  function magHP(type,f,fc){const x=fc/f;if(type==='LR2'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='LR4'){return 1/Math.sqrt(1+Math.pow(x,8))}if(type==='Butterworth'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='Bessel'){const xx=(f/fc);const num=3;const den=Math.sqrt(xx**4+3*xx**2+3);return Math.min(1,num/den)}return 1/Math.sqrt(1+x*x)}
+  function magLP(type,f,fc){
+    const x=f/fc;
+    if(type==='LR2'){return 1/Math.sqrt(1+Math.pow(x,4))}
+    if(type==='LR4'){return 1/Math.sqrt(1+Math.pow(x,8))}
+    if(type==='Butterworth'){return 1/Math.sqrt(1+Math.pow(x,4))}
+    if(type==='Bessel'){
+      const num=3;
+      const den=Math.sqrt(Math.pow(x,4)+3*Math.pow(x,2)+3);
+      return Math.min(1,num/den);
+    }
+    return 1/Math.sqrt(1+x*x)
+  }
+  function magHP(type,f,fc){
+    const x=fc/f;
+    if(type==='LR2'){return 1/Math.sqrt(1+Math.pow(x,4))}
+    if(type==='LR4'){return 1/Math.sqrt(1+Math.pow(x,8))}
+    if(type==='Butterworth'){return 1/Math.sqrt(1+Math.pow(x,4))}
+    if(type==='Bessel'){
+      const xx=(f/fc);
+      const num=3;
+      const den=Math.sqrt(Math.pow(xx,4)+3*Math.pow(xx,2)+3);
+      return Math.min(1,num/den)
+    }
+    return 1/Math.sqrt(1+x*x)
+  }
   function genFreq(){const arr=[];for(let p=Math.log10(20);p<=Math.log10(40000);p+=0.02){arr.push(10**p)}return arr}
   function wiringForHP(type){if(type==='LR4')return['C1(series)','L1(shunt)','C2(series)','L2(shunt)'];return['C(series)','L(shunt)']}
   function wiringForLP(type){if(type==='LR4')return['L1(series)','C1(shunt)','L2(series)','C2(shunt)'];return['L(series)','C(shunt)']}
