@@ -141,7 +141,19 @@
     }
     if(toggles.showDelta){ ds.push({label:'Delta (Ideal - Snapped)',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
     try {
-      chart=new Chart(ctx,{type:'line',data:{labels:freq,datasets:ds},options:{responsive:true,interaction:{mode:'nearest',intersect:false},plugins:{legend:{position:'bottom'}},scales:{x:{type:'logarithmic',min:20,max:40000,ticks:{callback:(v)=>v},title:{display:true,text:'Hz'}},y:{title:{display:true,text:'dB'},suggestedMin:-50,suggestedMax:10}}});
+      chart=new Chart(ctx,{
+        type:'line',
+        data:{ labels:freq, datasets:ds },
+        options:{
+          responsive:true,
+          interaction:{ mode:'nearest', intersect:false },
+          plugins:{ legend:{ position:'bottom' } },
+          scales:{
+            x:{ type:'logarithmic', min:20, max:40000, ticks:{ callback:function(value){ return value; } }, title:{ display:true, text:'Hz' } },
+            y:{ title:{ display:true, text:'dB' }, suggestedMin:-50, suggestedMax:10 }
+          }
+        }
+      });
     } catch (e) {
       // 何もしない（グラフ以外の機能は継続）
       console && console.warn && console.warn('Chart draw skipped:', e);
