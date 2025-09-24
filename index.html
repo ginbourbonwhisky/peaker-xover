@@ -365,12 +365,24 @@
     const designConditions = parts[0] || '';
     const calculationResults = parts.slice(1).join('---') || results;
     
+    // 設計条件を整理（システム情報を抽出）
+    const designLines = designConditions.split('\n').filter(line => line.trim());
+    const systemInfo = designLines.filter(line => 
+      line.includes('システム：') || 
+      line.includes('SPL基準:') || 
+      line.includes('目標クロス周波数：') || 
+      line.includes('HP（Tweeter）：') || 
+      line.includes('LP（Woofer）：') || 
+      line.includes('Zobel（Woofer補正）：') || 
+      line.includes('L-pad（Tweeter減衰）：')
+    );
+    
     const markdown = `# スピーカーネットワーク設計結果
 
 **生成日時:** ${timestamp}
 
 ## 設計条件
-${designConditions}
+${systemInfo.join('\n')}
 
 ## 計算結果
 ${calculationResults}
