@@ -110,7 +110,19 @@
       if(toggles.showSum)ds.push({label:'Sum (Snapped)',data:series.sumSnap,borderColor:'#666',pointRadius:0,borderDash:[4,2]});
     }
     if(toggles.showDelta){ ds.push({label:'Delta (Ideal - Snapped)',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
-    chart=new Chart(ctx,{type:'line',data:{labels:freq,datasets:ds},options:{responsive:true,interaction:{mode:'nearest',intersect:false},plugins:{legend:{position:'bottom'}},scales:{x:{type:'logarithmic',min:20,max:40000,ticks:{callback:(v)=>v},title:{display:true,text:'Hz'}},y:{title:{display:true,text:'dB'},suggestedMin:-50,suggestedMax:10}}});
+    chart=new Chart(ctx,{
+      type:'line',
+      data:{ labels:freq, datasets:ds },
+      options:{
+        responsive:true,
+        interaction:{ mode:'nearest', intersect:false },
+        plugins:{ legend:{ position:'bottom' } },
+        scales:{
+          x:{ type:'logarithmic', min:20, max:40000, ticks:{ callback:function(v){ return v; } }, title:{ display:true, text:'Hz' } },
+          y:{ title:{ display:true, text:'dB' }, min:-20, max:20 }
+        }
+      }
+    });
   }
   function run(){
     const system=el('system').value;
