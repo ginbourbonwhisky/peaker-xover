@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Speaker Xover (2-way)</title>
-  <style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speaker Xover (2-way)</title>
+<style>
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:16px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
   label{display:flex;flex-direction:column;font-size:12px}
@@ -16,9 +15,7 @@
   fieldset.toggles label{display:flex;flex-direction:row;align-items:center;gap:6px}
   #results{white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px;margin-top:12px}
   canvas{background:#fff;border-radius:8px;max-width:980px}
-  </style>
-</head>
-<body>
+</style>
 <h1>スピーカーネットワーク設計（2‑way）</h1>
 <div class="row">
   <label>システム
@@ -41,7 +38,7 @@
   </label>
 </div>
 
-<h3>LP（Woofer）</h3>
+<h3>ウーファー</h3>
 <div class="row">
   <label>Ω<input id="wz" type="number" value="8"></label>
   <label>dB<input id="wspl" type="number" value="90" step="0.1"></label>
@@ -53,7 +50,7 @@
   </label>
 </div>
 
-<h3>HP（Tweeter）</h3>
+<h3>ツイーター</h3>
 <div class="row">
   <label>Ω<input id="tz" type="number" value="8"></label>
   <label>dB<input id="tspl" type="number" value="98" step="0.1"></label>
@@ -72,13 +69,12 @@
     <label><input type="checkbox" id="show-woo" checked> Woofer</label>
     <label><input type="checkbox" id="show-twe" checked> Tweeter</label>
     <label><input type="checkbox" id="show-sum" checked> Sum</label>
-    <label><input type="checkbox" id="show-snapped" checked> スナップ後（実用値）</label>
-    <label><input type="checkbox" id="show-delta"> 差分（理想−スナップ後）</label>
-    <label><input type="checkbox" id="show-imp" checked> インピーダンスZ</label>
+    <label><input type="checkbox" id="show-snapped" checked> Snapped</label>
+    <label><input type="checkbox" id="show-delta"> Delta</label>
   </fieldset>
 </div>
 
-<canvas id="plot" height="90"></canvas>
+<canvas id="plot" height="260"></canvas>
 <div id="results"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -90,72 +86,18 @@
   function lpad(z,att){const A=dbToRatio(att);if(A<=1)return{Rs:0,Rp:Infinity,Zin:z,A:1};const Rs=z*(A-1)/A;const Rp=z*A/(A-1);const Zin=Rs+1/(1/Rp+1/z);return{Rs,Rp,Zin,A}}
   function snapR(target,tol=0.05){let best=null;const push=(val,parts)=>{const err=Math.abs(val-target)/target;if(err<=tol&&(!best||err<best.err))best={val,err,parts}};for(const r of takman)push(r,[`${r}Ω`]);for(const r1 of takman)for(const r2 of takman)push(r1+r2,[`${r1}Ω+${r2}Ω`]);for(const r1 of takman)for(const r2 of takman){const v=1/(1/r1+1/r2);push(v,[`${r1}Ω||${r2}Ω`])}return best}
   function estimateZobel(zNom,fc){const Re=0.8*zNom;const Le=zNom/(2*Math.PI*fc*5);const Rz=Re;const Cz=Le/(Rz*Rz);return{Re,Le,Rz,Cz}}
-  // 簡易インピーダンスモデル（名目Z + Zobel + L-padの影響）
-  function calcImpedanceCurve(freq, zNom, useZobel, zobel, lpadMode, lpVals){
-    const twoPi = 2*Math.PI;
-    return freq.map(function(f){
-      // Woofer側: 名目直列抵抗 zNom を基礎に、Zobel(R-C直列の並列)を付加
-      let Zw = zNom; // 実装簡易化：上昇分は無視し、Zobel適用時にやや低下させる
-      if(useZobel && zobel){
-        const Rz = zobel.Rz;
-        const Cz = zobel.Cz;
-        // 簡略: 並列合成の実数近似（Cが働く帯域で若干低下）。fc付近で効果が高い。
-        const w = twoPi*f;
-        const w0 = twoPi*2000; // 目安周波数
-        const weight = 1/(1 + Math.pow(w/w0,2));
-        Zw = zNom * (1 - 0.15*weight); // ざっくり15%低下モデル
-      }
-      // Tweeter側: L-pad（自動時）は入力Zが名目に近い
-      let Zt = zNom;
-      if(lpadMode==='auto' && lpVals){
-        const Rs = lpVals.Rs, Rp = isFinite(lpVals.Rp)? lpVals.Rp : 1e9;
-        const Zin = Rs + 1/(1/Rp + 1/zNom);
-        Zt = Zin;
-      }
-      // 合成Z（並列）
-      const Zsys = 1/(1/Zw + 1/Zt);
-      return Zsys;
-    });
-  }
   function autoPol(w,t){const evenW=(w==='LR2'||w==='LR4'||w==='Butterworth');const evenT=(t==='LR2'||t==='LR4'||t==='Butterworth');return (evenW&&evenT)?'invert':'normal'}
   function fmtOhm(x){return x===Infinity?'∞':(Math.round(x*100)/100).toFixed(2)+' Ω'}
   function fmtCap(c){return (c*1e6).toFixed(3)+' µF'}
   function fmtInd(l){return (l*1e3).toFixed(3)+' mH'}
-  function magLP(type,f,fc){
-    const x=f/fc;
-    if(type==='LR2'){return 1/Math.sqrt(1+Math.pow(x,4))}
-    if(type==='LR4'){return 1/Math.sqrt(1+Math.pow(x,8))}
-    if(type==='Butterworth'){return 1/Math.sqrt(1+Math.pow(x,4))}
-    if(type==='Bessel'){
-      const num=3;
-      const den=Math.sqrt(Math.pow(x,4)+3*Math.pow(x,2)+3);
-      return Math.min(1,num/den);
-    }
-    return 1/Math.sqrt(1+x*x)
-  }
-  function magHP(type,f,fc){
-    const x=fc/f;
-    if(type==='LR2'){return 1/Math.sqrt(1+Math.pow(x,4))}
-    if(type==='LR4'){return 1/Math.sqrt(1+Math.pow(x,8))}
-    if(type==='Butterworth'){return 1/Math.sqrt(1+Math.pow(x,4))}
-    if(type==='Bessel'){
-      const xx=(f/fc);
-      const num=3;
-      const den=Math.sqrt(Math.pow(xx,4)+3*Math.pow(xx,2)+3);
-      return Math.min(1,num/den)
-    }
-    return 1/Math.sqrt(1+x*x)
-  }
-  function genFreq(){const arr=[];for(let p=Math.log10(20);p<=Math.log10(40000);p+=0.02){arr.push(Math.pow(10,p))}return arr}
+  function magLP(type,f,fc){const x=f/fc;if(type==='LR2'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='LR4'){return 1/Math.sqrt(1+Math.pow(x,8))}if(type==='Butterworth'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='Bessel'){const num=3;const den=Math.sqrt(x**4+3*x**2+3);return Math.min(1,num/den)}return 1/Math.sqrt(1+x*x)}
+  function magHP(type,f,fc){const x=fc/f;if(type==='LR2'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='LR4'){return 1/Math.sqrt(1+Math.pow(x,8))}if(type==='Butterworth'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='Bessel'){const xx=(f/fc);const num=3;const den=Math.sqrt(xx**4+3*xx**2+3);return Math.min(1,num/den)}return 1/Math.sqrt(1+x*x)}
+  function genFreq(){const arr=[];for(let p=Math.log10(20);p<=Math.log10(40000);p+=0.02){arr.push(10**p)}return arr}
   function wiringForHP(type){if(type==='LR4')return['C1(series)','L1(shunt)','C2(series)','L2(shunt)'];return['C(series)','L(shunt)']}
   function wiringForLP(type){if(type==='LR4')return['L1(series)','C1(shunt)','L2(series)','C2(shunt)'];return['L(series)','C(shunt)']}
   function formatWiringLine(prefix,parts,tail=''){return`${prefix} ${parts.map(p=>p).join(' → ')}${tail}`}
   let chart;
   function draw2Way(freq,series,toggles){
-    // Chart.js が未ロードでもアプリが止まらないようにガード
-    if (typeof window.Chart === 'undefined') {
-      return; // グラフは描かないが他機能は動かす
-    }
     const ctx=el('plot').getContext('2d');
     if(chart)chart.destroy();
     const ds=[];
@@ -163,34 +105,12 @@
     if(toggles.showTwe)ds.push({label:'Tweeter',data:series.tIdeal,borderColor:'#06c',pointRadius:0});
     if(toggles.showSum)ds.push({label:'Sum',data:series.sumIdeal,borderColor:'#000',pointRadius:0});
     if(toggles.showSnapped){
-      if(toggles.showWoo)ds.push({label:'Woofer（スナップ後）',data:series.wSnap,borderColor:'#f88',pointRadius:0,borderDash:[4,2]});
-      if(toggles.showTwe)ds.push({label:'Tweeter（スナップ後）',data:series.tSnap,borderColor:'#8af',pointRadius:0,borderDash:[4,2]});
-      if(toggles.showSum)ds.push({label:'Sum（スナップ後）',data:series.sumSnap,borderColor:'#666',pointRadius:0,borderDash:[4,2]});
+      if(toggles.showWoo)ds.push({label:'Woofer (Snapped)',data:series.wSnap,borderColor:'#f88',pointRadius:0,borderDash:[4,2]});
+      if(toggles.showTwe)ds.push({label:'Tweeter (Snapped)',data:series.tSnap,borderColor:'#8af',pointRadius:0,borderDash:[4,2]});
+      if(toggles.showSum)ds.push({label:'Sum (Snapped)',data:series.sumSnap,borderColor:'#666',pointRadius:0,borderDash:[4,2]});
     }
-    if(toggles.showDelta){ ds.push({label:'差分（理想−スナップ後）',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
-    // インピーダンス（Ω）右軸
-    if (toggles.showImp && series.impedance) {
-      ds.push({label:'インピーダンスZ（Ω）',data:series.impedance,borderColor:'#888',pointRadius:0,borderDash:[6,3],yAxisID:'y2'});
-    }
-    try {
-      chart=new Chart(ctx,{
-        type:'line',
-        data:{ labels:freq, datasets:ds },
-        options:{
-          responsive:true,
-          interaction:{ mode:'nearest', intersect:false },
-          plugins:{ legend:{ position:'bottom' } },
-          scales:{
-            x:{ type:'logarithmic', min:20, max:40000, ticks:{ callback:function(value){ return value; } }, title:{ display:true, text:'Hz' } },
-            y:{ title:{ display:true, text:'dB' }, min:-20, max:20 },
-            y2:{ type:'linear', position:'right', display: toggles.showImp === true, title:{ display:true, text:'Ω' }, suggestedMin: 2, suggestedMax: 20, grid:{ drawOnChartArea:false } }
-          }
-        }
-      });
-    } catch (e) {
-      // 何もしない（グラフ以外の機能は継続）
-      console && console.warn && console.warn('Chart draw skipped:', e);
-    }
+    if(toggles.showDelta){ ds.push({label:'Delta (Ideal - Snapped)',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
+    chart=new Chart(ctx,{type:'line',data:{labels:freq,datasets:ds},options:{responsive:true,interaction:{mode:'nearest',intersect:false},plugins:{legend:{position:'bottom'}},scales:{x:{type:'logarithmic',min:20,max:40000,ticks:{callback:(v)=>v},title:{display:true,text:'Hz'}},y:{title:{display:true,text:'dB'},suggestedMin:-50,suggestedMax:10}}});
   }
   function run(){
     const system=el('system').value;
@@ -216,16 +136,13 @@
     const tMag=freq.map((f,i)=> tMagIdeal[i]*(lpadMode==='auto'? 1/lp.A : 1));
     const wIdealDb=wMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
     const tIdealDb=tMagIdeal.map(m=> ratioToDb(m) + (tspl-systemSPL));
-    // L-padの減衰は tMag に 1/A を掛けて既に反映しているため、ここで再度 needAtt を引かない
-    const tSnapDb=tMag.map(m=> ratioToDb(m) + (tspl-systemSPL));
+    const tSnapDb=tMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - (lpadMode==='auto'? needAtt:0));
     const invert = (autoPol(wtype,ttype)==='invert');
     function sumDb(aDb,bDb,inv){ const a=dbToRatio(aDb), b=dbToRatio(bDb)*(inv?-1:1); const mag=Math.sqrt(Math.max(0,a*a+b*b)); return ratioToDb(mag); }
     const sumIdealDb=freq.map((_,i)=> sumDb(wIdealDb[i], tIdealDb[i], invert));
     const sumSnapDb=freq.map((_,i)=> sumDb(wIdealDb[i], tSnapDb[i], invert));
     const deltaDb=freq.map((_,i)=> sumIdealDb[i]-sumSnapDb[i]);
-    // インピーダンス簡易計算（Zobel/L-padの影響を含む近似）
-    const impCurve = calcImpedanceCurve(freq, wz, (el('wzobel').value==='on'), zbl, lpadMode, lp);
-    draw2Way(freq,{ wIdeal:wIdealDb, tIdeal:tIdealDb, sumIdeal:sumIdealDb, wSnap:wIdealDb, tSnap:tSnapDb, sumSnap:sumSnapDb, delta:deltaDb, impedance: impCurve },{ showWoo:el('show-woo').checked, showTwe:el('show-twe').checked, showSum:el('show-sum').checked, showSnapped:el('show-snapped').checked, showDelta:el('show-delta').checked, showImp: el('show-imp').checked });
+    draw2Way(freq,{ wIdeal:wIdealDb, tIdeal:tIdealDb, sumIdeal:sumIdealDb, wSnap:wIdealDb, tSnap:tSnapDb, sumSnap:sumSnapDb, delta:deltaDb },{ showWoo:el('show-woo').checked, showTwe:el('show-twe').checked, showSum:el('show-sum').checked, showSnapped:el('show-snapped').checked, showDelta:el('show-delta').checked });
     const slopeText = s => s==='LR4'? 'LR4（24 dB/oct）': s==='LR2'? 'LR2（12 dB/oct）' : s;
     const lines=[];
     lines.push('---');
@@ -237,9 +154,9 @@
     lines.push(`・Zobel（Woofer補正）：${zbl? '使用（ON）':'未使用（OFF）'}`);
     lines.push(`・L-pad（Tweeter減衰）：${lpadMode==='auto'? '約−'+needAtt.toFixed(1)+' dB（定インピ）':'OFF'}`);
     lines.push('---\n');
-    lines.push(`■ 配線順（概略）:   HP（Tweeter） ${slopeText(ttype)}  ｜  LP（Woofer） ${slopeText(wtype)}`);
-    const hp=wiringForHP(ttype); const lpw=wiringForLP(wtype);
-    lines.push(formatWiringLine('[入力(＋)] → HP：', hp, ' → L-pad(Rs→Rp) → Tweeter(＋)'));
+    lines.push('■ 配線順（概略）');
+    const hpWire=wiringForHP(ttype); const lpw=wiringForLP(wtype);
+    lines.push(formatWiringLine('[入力(＋)] → HP：', hpWire, ' → L-pad(Rs→Rp) → Tweeter(＋)'));
     lines.push(formatWiringLine('           → LP：', lpw, ' → Woofer(＋) ／ Woofer端子＋−間に [Rz−Cz直列] を並列（Zobel）'));
     lines.push('[入力(−)] → Tweeter(−), Woofer(−)\n');
     lines.push('■ L-pad（ツイーター減衰）');
@@ -258,27 +175,14 @@
     lines.push('■ Zobel（Woofer補正）');
     if (zbl){ lines.push(`Rz = ${fmtOhm(zbl.Rz)}`); lines.push(`Cz = ${fmtCap(zbl.Cz)}（Re/Le内部推定）`); } else { lines.push('未適用'); }
     lines.push('');
-    // 受動フィルタ素子（暫定近似）: 1次係数をベースに LR2=一次×2, LR4=一次×4 として概略提示
-    const twoPi = 2*Math.PI;
-    const L1st_w = wz/(twoPi*fc);      // 1次LP L(series)
-    const C1st_w = 1/(twoPi*wz*fc);    // 1次LP C(shunt)
-    const C1st_t = 1/(twoPi*tz*fc);    // 1次HP C(series)
-    const L1st_t = tz/(twoPi*fc);      // 1次HP L(shunt)
-    function hpParts(type){ if(type==='LR4') return { C1:C1st_t, L1:L1st_t, C2:C1st_t, L2:L1st_t, note:'LR4近似（1次×4）'}; return { C1:C1st_t, L1:L1st_t, C2:undefined, L2:undefined, note:'LR2近似（1次×2）'}; }
-    function lpParts(type){ if(type==='LR4') return { L1:L1st_w, C1:C1st_w, L2:L1st_w, C2:C1st_w, note:'LR4近似（1次×4）'}; return { L1:L1st_w, C1:C1st_w, L2:undefined, C2:undefined, note:'LR2近似（1次×2）'}; }
-    const hp=hpParts(ttype); const lpv=lpParts(wtype);
-    lines.push('■ HP（Tweeter）素子値（暫定近似）');
-    lines.push(`C1(series)：${fmtCap(hp.C1)}  ／  L1(shunt)：${fmtInd(hp.L1)}`);
-    if(hp.C2!==undefined) lines.push(`C2(series)：${fmtCap(hp.C2)}  ／  L2(shunt)：${fmtInd(hp.L2)}  (${hp.note})`);
-    lines.push('');
-    lines.push('■ LP（Woofer）素子値（暫定近似）');
-    lines.push(`L(series)：${fmtInd(lpv.L1)}  ／  C(shunt)：${fmtCap(lpv.C1)}`);
-    if(lpv.L2!==undefined) lines.push(`L2(series)：${fmtInd(lpv.L2)}  ／  C2(shunt)：${fmtCap(lpv.C2)}  (${lpv.note})`);
+    const L1=wz/(2*Math.PI*fc), C1=1/(2*Math.PI*tz*fc);
+    lines.push('■ 参考（1次理想値の目安）');
+    lines.push(`Low-pass L(series)：${fmtInd(L1)}`);
+    lines.push(`High-pass C(series)：${fmtCap(C1)}`);
     el('results').textContent = lines.join('\n');
   }
-  ['show-woo','show-twe','show-sum','show-snapped','show-delta','show-imp'].forEach(function(id){ el(id).addEventListener('change', run); });
+  ['show-woo','show-twe','show-sum','show-snapped','show-delta'].forEach(id=>{ el(id).addEventListener('change', run); });
   el('calc').addEventListener('click', run);
   run();
 </script>
-</body>
 </html>
