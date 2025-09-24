@@ -216,7 +216,8 @@
     const tMag=freq.map((f,i)=> tMagIdeal[i]*(lpadMode==='auto'? 1/lp.A : 1));
     const wIdealDb=wMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
     const tIdealDb=tMagIdeal.map(m=> ratioToDb(m) + (tspl-systemSPL));
-    const tSnapDb=tMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - (lpadMode==='auto'? needAtt:0));
+    // L-padの減衰は tMag に 1/A を掛けて既に反映しているため、ここで再度 needAtt を引かない
+    const tSnapDb=tMag.map(m=> ratioToDb(m) + (tspl-systemSPL));
     const invert = (autoPol(wtype,ttype)==='invert');
     function sumDb(aDb,bDb,inv){ const a=dbToRatio(aDb), b=dbToRatio(bDb)*(inv?-1:1); const mag=Math.sqrt(Math.max(0,a*a+b*b)); return ratioToDb(mag); }
     const sumIdealDb=freq.map((_,i)=> sumDb(wIdealDb[i], tIdealDb[i], invert));
