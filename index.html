@@ -258,10 +258,22 @@
     lines.push('■ Zobel（Woofer補正）');
     if (zbl){ lines.push(`Rz = ${fmtOhm(zbl.Rz)}`); lines.push(`Cz = ${fmtCap(zbl.Cz)}（Re/Le内部推定）`); } else { lines.push('未適用'); }
     lines.push('');
-    const L1=wz/(2*Math.PI*fc), C1=1/(2*Math.PI*tz*fc);
-    lines.push('■ 参考（1次理想値の目安）');
-    lines.push(`Low-pass L(series)：${fmtInd(L1)}`);
-    lines.push(`High-pass C(series)：${fmtCap(C1)}`);
+    // 受動フィルタ素子（暫定近似）: 1次係数をベースに LR2=一次×2, LR4=一次×4 として概略提示
+    const twoPi = 2*Math.PI;
+    const L1st_w = wz/(twoPi*fc);      // 1次LP L(series)
+    const C1st_w = 1/(twoPi*wz*fc);    // 1次LP C(shunt)
+    const C1st_t = 1/(twoPi*tz*fc);    // 1次HP C(series)
+    const L1st_t = tz/(twoPi*fc);      // 1次HP L(shunt)
+    function hpParts(type){ if(type==='LR4') return { C1:C1st_t, L1:L1st_t, C2:C1st_t, L2:L1st_t, note:'LR4近似（1次×4）'}; return { C1:C1st_t, L1:L1st_t, C2:undefined, L2:undefined, note:'LR2近似（1次×2）'}; }
+    function lpParts(type){ if(type==='LR4') return { L1:L1st_w, C1:C1st_w, L2:L1st_w, C2:C1st_w, note:'LR4近似（1次×4）'}; return { L1:L1st_w, C1:C1st_w, L2:undefined, C2:undefined, note:'LR2近似（1次×2）'}; }
+    const hp=hpParts(ttype); const lpv=lpParts(wtype);
+    lines.push('■ HP（Tweeter）素子値（暫定近似）');
+    lines.push(`C1(series)：${fmtCap(hp.C1)}  ／  L1(shunt)：${fmtInd(hp.L1)}`);
+    if(hp.C2!==undefined) lines.push(`C2(series)：${fmtCap(hp.C2)}  ／  L2(shunt)：${fmtInd(hp.L2)}  (${hp.note})`);
+    lines.push('');
+    lines.push('■ LP（Woofer）素子値（暫定近似）');
+    lines.push(`L(series)：${fmtInd(lpv.L1)}  ／  C(shunt)：${fmtCap(lpv.C1)}`);
+    if(lpv.L2!==undefined) lines.push(`L2(series)：${fmtInd(lpv.L2)}  ／  C2(shunt)：${fmtCap(lpv.C2)}  (${lpv.note})`);
     el('results').textContent = lines.join('\n');
   }
   ['show-woo','show-twe','show-sum','show-snapped','show-delta','show-imp'].forEach(function(id){ el(id).addEventListener('change', run); });
