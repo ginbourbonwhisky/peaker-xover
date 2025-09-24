@@ -121,6 +121,10 @@
   function formatWiringLine(prefix,parts,tail=''){return`${prefix} ${parts.map(p=>p).join(' → ')}${tail}`}
   let chart;
   function draw2Way(freq,series,toggles){
+    // Chart.js が未ロードでもアプリが止まらないようにガード
+    if (typeof window.Chart === 'undefined') {
+      return; // グラフは描かないが他機能は動かす
+    }
     const ctx=el('plot').getContext('2d');
     if(chart)chart.destroy();
     const ds=[];
@@ -133,7 +137,12 @@
       if(toggles.showSum)ds.push({label:'Sum (Snapped)',data:series.sumSnap,borderColor:'#666',pointRadius:0,borderDash:[4,2]});
     }
     if(toggles.showDelta){ ds.push({label:'Delta (Ideal - Snapped)',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
-    chart=new Chart(ctx,{type:'line',data:{labels:freq,datasets:ds},options:{responsive:true,interaction:{mode:'nearest',intersect:false},plugins:{legend:{position:'bottom'}},scales:{x:{type:'logarithmic',min:20,max:40000,ticks:{callback:(v)=>v},title:{display:true,text:'Hz'}},y:{title:{display:true,text:'dB'},suggestedMin:-50,suggestedMax:10}}});
+    try {
+      chart=new Chart(ctx,{type:'line',data:{labels:freq,datasets:ds},options:{responsive:true,interaction:{mode:'nearest',intersect:false},plugins:{legend:{position:'bottom'}},scales:{x:{type:'logarithmic',min:20,max:40000,ticks:{callback:(v)=>v},title:{display:true,text:'Hz'}},y:{title:{display:true,text:'dB'},suggestedMin:-50,suggestedMax:10}}});
+    } catch (e) {
+      // 何もしない（グラフ以外の機能は継続）
+      console && console.warn && console.warn('Chart draw skipped:', e);
+    }
   }
   function run(){
     const system=el('system').value;
