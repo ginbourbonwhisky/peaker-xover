@@ -38,7 +38,7 @@
   </label>
 </div>
 
-<h3>ウーファー</h3>
+<h3>LP（Woofer）</h3>
 <div class="row">
   <label>Ω<input id="wz" type="number" value="8"></label>
   <label>dB<input id="wspl" type="number" value="90" step="0.1"></label>
@@ -50,7 +50,7 @@
   </label>
 </div>
 
-<h3>ツイーター</h3>
+<h3>HP（Tweeter）</h3>
 <div class="row">
   <label>Ω<input id="tz" type="number" value="8"></label>
   <label>dB<input id="tspl" type="number" value="98" step="0.1"></label>
@@ -69,12 +69,12 @@
     <label><input type="checkbox" id="show-woo" checked> Woofer</label>
     <label><input type="checkbox" id="show-twe" checked> Tweeter</label>
     <label><input type="checkbox" id="show-sum" checked> Sum</label>
-    <label><input type="checkbox" id="show-snapped" checked> Snapped</label>
-    <label><input type="checkbox" id="show-delta"> Delta</label>
+    <label><input type="checkbox" id="show-snapped" checked> スナップ後（実用値）</label>
+    <label><input type="checkbox" id="show-delta"> 差分（理想−スナップ後）</label>
   </fieldset>
 </div>
 
-<canvas id="plot" height="260"></canvas>
+<canvas id="plot" height="90"></canvas>
 <div id="results"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -105,11 +105,11 @@
     if(toggles.showTwe)ds.push({label:'Tweeter',data:series.tIdeal,borderColor:'#06c',pointRadius:0});
     if(toggles.showSum)ds.push({label:'Sum',data:series.sumIdeal,borderColor:'#000',pointRadius:0});
     if(toggles.showSnapped){
-      if(toggles.showWoo)ds.push({label:'Woofer (Snapped)',data:series.wSnap,borderColor:'#f88',pointRadius:0,borderDash:[4,2]});
-      if(toggles.showTwe)ds.push({label:'Tweeter (Snapped)',data:series.tSnap,borderColor:'#8af',pointRadius:0,borderDash:[4,2]});
-      if(toggles.showSum)ds.push({label:'Sum (Snapped)',data:series.sumSnap,borderColor:'#666',pointRadius:0,borderDash:[4,2]});
+      if(toggles.showWoo)ds.push({label:'Woofer（スナップ後）',data:series.wSnap,borderColor:'#f88',pointRadius:0,borderDash:[4,2]});
+      if(toggles.showTwe)ds.push({label:'Tweeter（スナップ後）',data:series.tSnap,borderColor:'#8af',pointRadius:0,borderDash:[4,2]});
+      if(toggles.showSum)ds.push({label:'Sum（スナップ後）',data:series.sumSnap,borderColor:'#666',pointRadius:0,borderDash:[4,2]});
     }
-    if(toggles.showDelta){ ds.push({label:'Delta (Ideal - Snapped)',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
+    if(toggles.showDelta){ ds.push({label:'差分（理想−スナップ後）',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
     chart=new Chart(ctx,{
       type:'line',
       data:{ labels:freq, datasets:ds },
@@ -193,7 +193,7 @@
     lines.push(`High-pass C(series)：${fmtCap(C1)}`);
     el('results').textContent = lines.join('\n');
   }
-  ['show-woo','show-twe','show-sum','show-snapped','show-delta'].forEach(id=>{ el(id).addEventListener('change', run); });
+  ['show-woo','show-twe','show-sum','show-snapped','show-delta'].forEach(function(id){ el(id).addEventListener('change', run); });
   el('calc').addEventListener('click', run);
   run();
 </script>
