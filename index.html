@@ -145,7 +145,8 @@
     const freq=genFreq();
     const wMag=freq.map(f=> magLP(wtype,f,fc));
     const tMagIdeal=freq.map(f=> magHP(ttype,f,fc));
-    const tMag=freq.map((f,i)=> tMagIdeal[i]*(lpadMode==='auto'? 1/lp.A : 1));
+    // L-pad減衰はdB側で適用（二重適用防止のため振幅には掛けない）
+    const tMag=tMagIdeal;
     const wIdealDb=wMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
     const tIdealDb=tMagIdeal.map(m=> ratioToDb(m) + (tspl-systemSPL));
     const tSnapDb=tMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - (lpadMode==='auto'? needAtt:0));
@@ -166,7 +167,7 @@
     lines.push(`・Zobel（Woofer補正）：${zbl? '使用（ON）':'未使用（OFF）'}`);
     lines.push(`・L-pad（Tweeter減衰）：${lpadMode==='auto'? '約−'+needAtt.toFixed(1)+' dB（定インピ）':'OFF'}`);
     lines.push('---\n');
-    lines.push('■ 配線順（概略）');
+    lines.push(`■ 配線順（概略）:   HP（Tweeter） ${slopeText(ttype)}  ｜  LP（Woofer） ${slopeText(wtype)}`);
     const hpWire=wiringForHP(ttype); const lpw=wiringForLP(wtype);
     lines.push(formatWiringLine('[入力(＋)] → HP：', hpWire, ' → L-pad(Rs→Rp) → Tweeter(＋)'));
     lines.push(formatWiringLine('           → LP：', lpw, ' → Woofer(＋) ／ Woofer端子＋−間に [Rz−Cz直列] を並列（Zobel）'));
