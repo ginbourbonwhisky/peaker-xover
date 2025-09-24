@@ -80,11 +80,79 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   const el=id=>document.getElementById(id);
-  const takman=[0.1,0.2,0.3,0.5,1,1.2,1.5,1.8,2,3,3.3,3.9,4.3,4.7,5,5.6,6.2,6.8,7.5,8.2,9.1,10,12,15,18,20,24,30,39,43,47,51,62,75,82,100,120,150,180,200,220,240,270,300,330,390,430,470,510,560,680,750,820,1000,1200,1500,1800,2000,3000,4300,4700,5000,9100,10000,15000].map(x=>x>=1000?x/1000:x);
+  // タクマン推奨抵抗値リスト（ユーザー提供の完全版）
+  const TAKMAN_RESISTORS = [
+    0.1, 0.12, 0.15, 0.18, 0.22, 0.27, 0.33, 0.39, 0.47, 0.56, 0.68, 0.82,
+    1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2,
+    10, 12, 15, 18, 22, 27, 33, 39, 47, 56, 68, 82,
+    100, 120, 150, 180, 220, 270, 330, 390, 470, 560, 680, 820,
+    1000, 1200, 1500, 1800, 2200, 2700, 3300, 3900, 4700, 5600, 6800, 8200,
+    10000, 12000, 15000, 18000, 22000, 27000, 33000, 39000, 47000, 56000, 68000, 82000,
+    100000, 120000, 150000, 180000, 220000, 270000, 330000, 390000, 470000, 560000, 680000, 820000
+  ];
+  
   function dbToRatio(db){return Math.pow(10,db/20)}
   function ratioToDb(r){return 20*Math.log10(Math.max(r,1e-12))}
   function lpad(z,att){const A=dbToRatio(att);if(A<=1)return{Rs:0,Rp:Infinity,Zin:z,A:1};const Rs=z*(A-1)/A;const Rp=z*A/(A-1);const Zin=Rs+1/(1/Rp+1/z);return{Rs,Rp,Zin,A}}
-  function snapR(target,tol=0.05){let best=null;const push=(val,parts)=>{const err=Math.abs(val-target)/target;if(err<=tol&&(!best||err<best.err))best={val,err,parts}};for(const r of takman)push(r,[`${r}Ω`]);for(const r1 of takman)for(const r2 of takman)push(r1+r2,[`${r1}Ω+${r2}Ω`]);for(const r1 of takman)for(const r2 of takman){const v=1/(1/r1+1/r2);push(v,[`${r1}Ω||${r2}Ω`])}return best}
+  
+  // 抵抗スナップ機能（単一・直列・並列組合せ）
+  function snapResistor(target, list = TAKMAN_RESISTORS) {
+    let best = list[0];
+    let bestErr = Math.abs(target - best);
+    for (let r of list) {
+      const err = Math.abs(target - r);
+      if (err < bestErr) { best = r; bestErr = err; }
+    }
+    return { value: best, error: bestErr, errorPercent: (bestErr / target) * 100 };
+  }
+
+  function findOptimalResistorCombination(target, list = TAKMAN_RESISTORS) {
+    let best = { type: 'single', value: target, error: Infinity, combination: null };
+    
+    // 単一抵抗での最適値
+    const single = snapResistor(target, list);
+    if (single.errorPercent < 5) { // 5%以内なら単一抵抗を推奨
+      return { type: 'single', value: single.value, error: single.error, combination: null };
+    }
+    
+    // 直列組合せ探索
+    for (let r1 of list) {
+      for (let r2 of list) {
+        const series = r1 + r2;
+        const err = Math.abs(target - series);
+        if (err < best.error) {
+          best = { type: 'series', value: series, error: err, combination: [r1, r2] };
+        }
+      }
+    }
+    
+    // 並列組合せ探索
+    for (let r1 of list) {
+      for (let r2 of list) {
+        if (r1 === 0 || r2 === 0) continue;
+        const parallel = (r1 * r2) / (r1 + r2);
+        const err = Math.abs(target - parallel);
+        if (err < best.error) {
+          best = { type: 'parallel', value: parallel, error: err, combination: [r1, r2] };
+        }
+      }
+    }
+    
+    return best;
+  }
+  
+  // 抵抗組合せの表示フォーマット
+  function formatResistorCombination(optimal) {
+    if (optimal.type === 'single') {
+      return `${optimal.value}Ω (単一)`;
+    } else if (optimal.type === 'series') {
+      return `${optimal.value}Ω (${optimal.combination[0]}Ω + ${optimal.combination[1]}Ω)`;
+    } else if (optimal.type === 'parallel') {
+      return `${optimal.value}Ω (${optimal.combination[0]}Ω || ${optimal.combination[1]}Ω)`;
+    }
+    return `${optimal.value}Ω`;
+  }
+  
   function estimateZobel(zNom,fc){const Re=0.8*zNom;const Le=zNom/(2*Math.PI*fc*5);const Rz=Re;const Cz=Le/(Rz*Rz);return{Re,Le,Rz,Cz}}
   function autoPol(w,t){const evenW=(w==='LR2'||w==='LR4'||w==='Butterworth');const evenT=(t==='LR2'||t==='LR4'||t==='Butterworth');return (evenW&&evenT)?'invert':'normal'}
   function fmtOhm(x){return x===Infinity?'∞':(Math.round(x*100)/100).toFixed(2)+' Ω'}
@@ -209,13 +277,19 @@
     if (lpadMode==='auto'){
       lines.push(`必要減衰: ${needAtt.toFixed(2)} dB`);
       lines.push(`理論 Rs: ${fmtOhm(lp.Rs)}, Rp: ${fmtOhm(lp.Rp)}, 入力Z: ${fmtOhm(lp.Zin)}`);
-      if(RsSnap&&RpSnap){
-        lines.push(`スナップ Rs: ${fmtOhm(RsSnap.val)} (${RsSnap.parts.join(' ')})`);
-        lines.push(`スナップ Rp: ${fmtOhm(RpSnap.val)} (${RpSnap.parts.join(' ')})`);
-        lines.push(`スナップ後 入力Z: ${fmtOhm(ZinSnap)}`);
-      }else{
-        lines.push('スナップ: 適合候補なし（±5%以内）');
-      }
+      
+      // 新しい抵抗スナップ機能を使用
+      const RsOptimal = findOptimalResistorCombination(lp.Rs);
+      const RpOptimal = findOptimalResistorCombination(lp.Rp);
+      
+      lines.push(`実用 Rs: ${formatResistorCombination(RsOptimal)}`);
+      lines.push(`実用 Rp: ${formatResistorCombination(RpOptimal)}`);
+      
+      // スナップ後の入力インピーダンスを計算
+      const RsSnapped = RsOptimal.value;
+      const RpSnapped = RpOptimal.value;
+      const ZinSnapped = RsSnapped + 1/(1/RpSnapped + 1/tz);
+      lines.push(`スナップ後 入力Z: ${fmtOhm(ZinSnapped)}`);
     } else { lines.push('OFF'); }
     lines.push('');
     lines.push('■ Zobel（Woofer補正）');
@@ -230,28 +304,31 @@
       if (coeffs.order === 2) {
         const Q = coeffs.Q;
         if (isHP) {
-          // HP: C1(series), L1(shunt)
+          // HP: C1(series), L1(shunt) - 2次フィルタの正確な計算
           const C1 = 1 / (omega * z * Math.sqrt(2));
           const L1 = z / (omega * Math.sqrt(2));
           return { C1, L1, C2: undefined, L2: undefined, note: coeffs.note };
         } else {
-          // LP: L1(series), C1(shunt)
+          // LP: L1(series), C1(shunt) - 2次フィルタの正確な計算
           const L1 = z / (omega * Math.sqrt(2));
           const C1 = 1 / (omega * z * Math.sqrt(2));
           return { L1, C1, L2: undefined, C2: undefined, note: coeffs.note };
         }
       } else if (coeffs.order === 4) {
-        // LR4 = LR2 × LR2
-        const sqrt2 = Math.sqrt(2);
+        // LR4 = 2つの2次フィルタの直列接続（各段で異なる値）
         if (isHP) {
-          const C1 = 1 / (omega * z * sqrt2);
-          const L1 = z / (omega * sqrt2);
+          // 第1段: C1(series), L1(shunt)
+          const C1 = 1 / (omega * z * Math.sqrt(2));
+          const L1 = z / (omega * Math.sqrt(2));
+          // 第2段: C2(series), L2(shunt) - 同じ値（同一の2次フィルタ）
           const C2 = C1;
           const L2 = L1;
           return { C1, L1, C2, L2, note: 'LR4（2次×2段）' };
         } else {
-          const L1 = z / (omega * sqrt2);
-          const C1 = 1 / (omega * z * sqrt2);
+          // 第1段: L1(series), C1(shunt)
+          const L1 = z / (omega * Math.sqrt(2));
+          const C1 = 1 / (omega * z * Math.sqrt(2));
+          // 第2段: L2(series), C2(shunt) - 同じ値（同一の2次フィルタ）
           const L2 = L1;
           const C2 = C1;
           return { L1, C1, L2, C2, note: 'LR4（2次×2段）' };
