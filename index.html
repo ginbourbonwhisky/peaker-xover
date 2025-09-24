@@ -90,8 +90,41 @@
   function fmtOhm(x){return x===Infinity?'∞':(Math.round(x*100)/100).toFixed(2)+' Ω'}
   function fmtCap(c){return (c*1e6).toFixed(3)+' µF'}
   function fmtInd(l){return (l*1e3).toFixed(3)+' mH'}
-  function magLP(type,f,fc){const x=f/fc;if(type==='LR2'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='LR4'){return 1/Math.sqrt(1+Math.pow(x,8))}if(type==='Butterworth'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='Bessel'){const num=3;const den=Math.sqrt(x**4+3*x**2+3);return Math.min(1,num/den)}return 1/Math.sqrt(1+x*x)}
-  function magHP(type,f,fc){const x=fc/f;if(type==='LR2'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='LR4'){return 1/Math.sqrt(1+Math.pow(x,8))}if(type==='Butterworth'){return 1/Math.sqrt(1+Math.pow(x,4))}if(type==='Bessel'){const xx=(f/fc);const num=3;const den=Math.sqrt(xx**4+3*xx**2+3);return Math.min(1,num/den)}return 1/Math.sqrt(1+x*x)}
+  // フィルタ特性の正確な係数（教科書値）
+  function getFilterCoeffs(type){
+    if(type==='LR2') return { Q:0.5, order:2, note:'LR2' };
+    if(type==='LR4') return { Q:0.5, order:4, note:'LR4' };
+    if(type==='Butterworth') return { Q:0.707, order:2, note:'Butterworth 2次' };
+    if(type==='Bessel') return { Q:0.577, order:2, note:'Bessel 2次' };
+    return { Q:0.5, order:2, note:'デフォルト' };
+  }
+  function magLP(type,f,fc){
+    const x=f/fc;
+    const coeffs = getFilterCoeffs(type);
+    if(coeffs.order===2){
+      const Q = coeffs.Q;
+      return 1/Math.sqrt(1 + Math.pow(x,4) + 2*Math.pow(x,2)*(2*Q*Q-1));
+    }
+    if(coeffs.order===4){
+      // LR4 = LR2 × LR2
+      const lr2 = 1/Math.sqrt(1 + Math.pow(x,4));
+      return lr2 * lr2;
+    }
+    return 1/Math.sqrt(1+x*x);
+  }
+  function magHP(type,f,fc){
+    const x=fc/f;
+    const coeffs = getFilterCoeffs(type);
+    if(coeffs.order===2){
+      const Q = coeffs.Q;
+      return 1/Math.sqrt(1 + Math.pow(x,4) + 2*Math.pow(x,2)*(2*Q*Q-1));
+    }
+    if(coeffs.order===4){
+      const lr2 = 1/Math.sqrt(1 + Math.pow(x,4));
+      return lr2 * lr2;
+    }
+    return 1/Math.sqrt(1+x*x);
+  }
   function genFreq(){const arr=[];for(let p=Math.log10(20);p<=Math.log10(40000);p+=0.02){arr.push(10**p)}return arr}
   function wiringForHP(type){if(type==='LR4')return['C1(series)','L1(shunt)','C2(series)','L2(shunt)'];return['C(series)','L(shunt)']}
   function wiringForLP(type){if(type==='LR4')return['L1(series)','C1(shunt)','L2(series)','C2(shunt)'];return['L(series)','C(shunt)']}
@@ -188,32 +221,55 @@
     lines.push('■ Zobel（Woofer補正）');
     if (zbl){ lines.push(`Rz = ${fmtOhm(zbl.Rz)}`); lines.push(`Cz = ${fmtCap(zbl.Cz)}（Re/Le内部推定）`); } else { lines.push('未適用'); }
     lines.push('');
-    // フィルタ素子の理論値（暫定: LR2=一次×2, LR4=一次×4。Butterworth/Besselは当面LR2相当で出力）
+    // フィルタ素子の理論値（正確な係数ベース）
     const twoPi = 2*Math.PI;
-    const L1st_w = wz/(twoPi*fc);      // 1次LP L(series)
-    const C1st_w = 1/(twoPi*wz*fc);    // 1次LP C(shunt)
-    const C1st_t = 1/(twoPi*tz*fc);    // 1次HP C(series)
-    const L1st_t = tz/(twoPi*fc);      // 1次HP L(shunt)
-    function mapTypeToOrder(type){ return (type==='LR4')? 4 : 2; }
-    function hpPartsObj(type){
-      const order = mapTypeToOrder(type);
-      if(order===4){ return { C1:C1st_t, L1:L1st_t, C2:C1st_t, L2:L1st_t, note:'LR4（1次×4 近似）' }; }
-      return { C1:C1st_t, L1:L1st_t, C2:undefined, L2:undefined, note:(type==='LR2'?'LR2':'LR2相当（暫定）') };
+    function calcFilterComponents(type, z, fc, isHP) {
+      const coeffs = getFilterCoeffs(type);
+      const omega = twoPi * fc;
+      
+      if (coeffs.order === 2) {
+        const Q = coeffs.Q;
+        if (isHP) {
+          // HP: C1(series), L1(shunt)
+          const C1 = 1 / (omega * z * Math.sqrt(2));
+          const L1 = z / (omega * Math.sqrt(2));
+          return { C1, L1, C2: undefined, L2: undefined, note: coeffs.note };
+        } else {
+          // LP: L1(series), C1(shunt)
+          const L1 = z / (omega * Math.sqrt(2));
+          const C1 = 1 / (omega * z * Math.sqrt(2));
+          return { L1, C1, L2: undefined, C2: undefined, note: coeffs.note };
+        }
+      } else if (coeffs.order === 4) {
+        // LR4 = LR2 × LR2
+        const sqrt2 = Math.sqrt(2);
+        if (isHP) {
+          const C1 = 1 / (omega * z * sqrt2);
+          const L1 = z / (omega * sqrt2);
+          const C2 = C1;
+          const L2 = L1;
+          return { C1, L1, C2, L2, note: 'LR4（2次×2段）' };
+        } else {
+          const L1 = z / (omega * sqrt2);
+          const C1 = 1 / (omega * z * sqrt2);
+          const L2 = L1;
+          const C2 = C1;
+          return { L1, C1, L2, C2, note: 'LR4（2次×2段）' };
+        }
+      }
+      return { note: '未対応' };
     }
-    function lpPartsObj(type){
-      const order = mapTypeToOrder(type);
-      if(order===4){ return { L1:L1st_w, C1:C1st_w, L2:L1st_w, C2:C1st_w, note:'LR4（1次×4 近似）' }; }
-      return { L1:L1st_w, C1:C1st_w, L2:undefined, C2:undefined, note:(type==='LR2'?'LR2':'LR2相当（暫定）') };
-    }
-    const hpPartsVals = hpPartsObj(ttype);
-    const lpPartsVals = lpPartsObj(wtype);
+    
+    const hpPartsVals = calcFilterComponents(ttype, tz, fc, true);
+    const lpPartsVals = calcFilterComponents(wtype, wz, fc, false);
+    
     lines.push('■ HP（Tweeter）素子値（理論）');
-    lines.push(`C1(series)：${fmtCap(hpPartsVals.C1)}  ／  L1(shunt)：${fmtInd(hpPartsVals.L1)}${hpPartsVals.C2?'' : ''}`);
-    if(hpPartsVals.C2!==undefined) lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}  ／  L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
+    lines.push(`C1(series)：${fmtCap(hpPartsVals.C1)}  ／  L1(shunt)：${fmtInd(hpPartsVals.L1)}`);
+    if(hpPartsVals.C2 !== undefined) lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}  ／  L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
     lines.push('');
     lines.push('■ LP（Woofer）素子値（理論）');
-    lines.push(`L(series)：${fmtInd(lpPartsVals.L1)}  ／  C(shunt)：${fmtCap(lpPartsVals.C1)}`);
-    if(lpPartsVals.L2!==undefined) lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  ／  C2(shunt)：${fmtCap(lpPartsVals.C2)}  （${lpPartsVals.note}）`);
+    lines.push(`L1(series)：${fmtInd(lpPartsVals.L1)}  ／  C1(shunt)：${fmtCap(lpPartsVals.C1)}`);
+    if(lpPartsVals.L2 !== undefined) lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  ／  C2(shunt)：${fmtCap(lpPartsVals.C2)}  （${lpPartsVals.note}）`);
     el('results').textContent = lines.join('\n');
   }
   ['show-woo','show-twe','show-sum','show-snapped','show-delta'].forEach(function(id){ el(id).addEventListener('change', run); });
