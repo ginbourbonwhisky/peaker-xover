@@ -168,6 +168,10 @@
       if(toggles.showSum)ds.push({label:'Sum（スナップ後）',data:series.sumSnap,borderColor:'#666',pointRadius:0,borderDash:[4,2]});
     }
     if(toggles.showDelta){ ds.push({label:'差分（理想−スナップ後）',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
+    // インピーダンス（Ω）右軸
+    if (toggles.showImp && series.impedance) {
+      ds.push({label:'インピーダンスZ（Ω）',data:series.impedance,borderColor:'#888',pointRadius:0,borderDash:[6,3],yAxisID:'y2'});
+    }
     try {
       chart=new Chart(ctx,{
         type:'line',
@@ -178,7 +182,8 @@
           plugins:{ legend:{ position:'bottom' } },
           scales:{
             x:{ type:'logarithmic', min:20, max:40000, ticks:{ callback:function(value){ return value; } }, title:{ display:true, text:'Hz' } },
-            y:{ title:{ display:true, text:'dB' }, min:-20, max:20 }
+            y:{ title:{ display:true, text:'dB' }, min:-20, max:20 },
+            y2:{ type:'linear', position:'right', display: toggles.showImp === true, title:{ display:true, text:'Ω' }, suggestedMin: 2, suggestedMax: 20, grid:{ drawOnChartArea:false } }
           }
         }
       });
@@ -219,8 +224,7 @@
     const deltaDb=freq.map((_,i)=> sumIdealDb[i]-sumSnapDb[i]);
     // インピーダンス簡易計算（Zobel/L-padの影響を含む近似）
     const impCurve = calcImpedanceCurve(freq, wz, (el('wzobel').value==='on'), zbl, lpadMode, lp);
-    // 現状はdBキャンバスにΩ軸は重ねず、UIでのZトグルは次コミットで別キャンバス表示に拡張予定
-    draw2Way(freq,{ wIdeal:wIdealDb, tIdeal:tIdealDb, sumIdeal:sumIdealDb, wSnap:wIdealDb, tSnap:tSnapDb, sumSnap:sumSnapDb, delta:deltaDb },{ showWoo:el('show-woo').checked, showTwe:el('show-twe').checked, showSum:el('show-sum').checked, showSnapped:el('show-snapped').checked, showDelta:el('show-delta').checked });
+    draw2Way(freq,{ wIdeal:wIdealDb, tIdeal:tIdealDb, sumIdeal:sumIdealDb, wSnap:wIdealDb, tSnap:tSnapDb, sumSnap:sumSnapDb, delta:deltaDb, impedance: impCurve },{ showWoo:el('show-woo').checked, showTwe:el('show-twe').checked, showSum:el('show-sum').checked, showSnapped:el('show-snapped').checked, showDelta:el('show-delta').checked, showImp: el('show-imp').checked });
     const slopeText = s => s==='LR4'? 'LR4（24 dB/oct）': s==='LR2'? 'LR2（12 dB/oct）' : s;
     const lines=[];
     lines.push('---');
@@ -259,7 +263,7 @@
     lines.push(`High-pass C(series)：${fmtCap(C1)}`);
     el('results').textContent = lines.join('\n');
   }
-  ['show-woo','show-twe','show-sum','show-snapped','show-delta'].forEach(function(id){ el(id).addEventListener('change', run); });
+  ['show-woo','show-twe','show-sum','show-snapped','show-delta','show-imp'].forEach(function(id){ el(id).addEventListener('change', run); });
   el('calc').addEventListener('click', run);
   run();
 </script>
