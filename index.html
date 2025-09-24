@@ -360,15 +360,20 @@
     const results = el('results').textContent;
     const timestamp = new Date().toLocaleString('ja-JP');
     
+    // 結果を設計条件と計算結果に分割
+    const parts = results.split('---');
+    const designConditions = parts[0] || '';
+    const calculationResults = parts.slice(1).join('---') || results;
+    
     const markdown = `# スピーカーネットワーク設計結果
 
 **生成日時:** ${timestamp}
 
 ## 設計条件
-${results.split('---')[0]}
+${designConditions}
 
 ## 計算結果
-${results.split('---')[1] || results}
+${calculationResults}
 
 ---
 *この結果は Speaker Network Calculator で生成されました*
