@@ -366,8 +366,8 @@
     const calculationResults = parts.slice(1).join('---') || results;
     
     // 設計条件を整理（システム情報を抽出）
-    const designLines = designConditions.split('\n').filter(line => line.trim());
-    const systemInfo = designLines.filter(line => 
+    const allLines = results.split('\n');
+    const systemInfo = allLines.filter(line => 
       line.includes('システム：') || 
       line.includes('SPL基準:') || 
       line.includes('目標クロス周波数：') || 
