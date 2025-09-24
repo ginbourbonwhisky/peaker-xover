@@ -65,6 +65,7 @@
 <div class="row row-inline">
   <button id="calc">計算する</button>
   <button id="export-markdown">Markdownエクスポート</button>
+  <button id="load-testcase">テストケース読み込み</button>
   <fieldset class="toggles">
     <legend>グラフ表示</legend>
     <label><input type="checkbox" id="show-woo" checked> Woofer</label>
@@ -401,6 +402,26 @@ ${calculationResults}
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  });
+  
+  // テストケース読み込み機能
+  el('load-testcase').addEventListener('click', function() {
+    // ユーザー提供のテストケース: 2-way, Woofer 8Ω/90dB, Tweeter 8Ω/98dB, Crossover 1800Hz, Tweeter LR4, Woofer LR2
+    el('system').value = '2way';
+    el('wz').value = '8';
+    el('wspl').value = '90';
+    el('tz').value = '8';
+    el('tspl').value = '98';
+    el('fc').value = '1800';
+    el('wtype').value = 'LR2';
+    el('ttype').value = 'LR4';
+    el('spl-basis').value = 'minEfficiency';
+    el('target-spl').value = '';
+    el('wzobel').value = 'on';
+    el('tlpad').value = 'auto';
+    
+    // 計算を実行
+    run();
   });
   
   run();
