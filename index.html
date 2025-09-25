@@ -305,37 +305,53 @@
       const coeffs = getFilterCoeffs(type);
       const omega = twoPi * fc;
       
-      if (coeffs.order === 2) {
-        const Q = coeffs.Q;
+      if (type === 'LR2') {
+        // LR2（2次リンクウィッツ・ライリー）の正確な計算式
         if (isHP) {
-          // HP: C1(series), L1(shunt) - 2次フィルタの正確な計算
-          const C1 = 1 / (omega * z * Math.sqrt(2));
-          const L1 = z / (omega * Math.sqrt(2));
-          return { C1, L1, C2: undefined, L2: undefined, note: coeffs.note };
+          const C1 = 1 / (4 * Math.PI * fc * z);
+          const L2 = z / (Math.PI * fc);
+          return { C1, L1: undefined, C2: undefined, L2, note: 'LR2（2次）' };
         } else {
-          // LP: L1(series), C1(shunt) - 2次フィルタの正確な計算
-          const L1 = z / (omega * Math.sqrt(2));
-          const C1 = 1 / (omega * z * Math.sqrt(2));
-          return { L1, C1, L2: undefined, C2: undefined, note: coeffs.note };
+          const L1 = z / (Math.PI * fc);
+          const C2 = 1 / (4 * Math.PI * fc * z);
+          return { L1, C1: undefined, L2: undefined, C2, note: 'LR2（2次）' };
         }
-      } else if (coeffs.order === 4) {
-        // LR4 = 2つの2次フィルタの直列接続（各段で異なる値）
+      } else if (type === 'LR4') {
+        // LR4（4次リンクウィッツ・ライリー）の正確な計算式
         if (isHP) {
-          // 第1段: C1(series), L1(shunt)
-          const C1 = 1 / (omega * z * Math.sqrt(2));
-          const L1 = z / (omega * Math.sqrt(2));
-          // 第2段: C2(series), L2(shunt) - 同じ値（同一の2次フィルタ）
-          const C2 = C1;
-          const L2 = L1;
-          return { C1, L1, C2, L2, note: 'LR4（2次×2段）' };
+          const C1 = (3 * Math.sqrt(2)) / (16 * Math.PI * fc * z);
+          const L1 = (2 * Math.sqrt(2) * z) / (9 * Math.PI * fc);
+          const C2 = (3 * Math.sqrt(2)) / (8 * Math.PI * fc * z);
+          const L2 = (Math.sqrt(2) * z) / (Math.PI * fc);
+          return { C1, L1, C2, L2, note: 'LR4（4次）' };
         } else {
-          // 第1段: L1(series), C1(shunt)
-          const L1 = z / (omega * Math.sqrt(2));
-          const C1 = 1 / (omega * z * Math.sqrt(2));
-          // 第2段: L2(series), C2(shunt) - 同じ値（同一の2次フィルタ）
-          const L2 = L1;
-          const C2 = C1;
-          return { L1, C1, L2, C2, note: 'LR4（2次×2段）' };
+          const L3 = (2 * Math.sqrt(2) * z) / (3 * Math.PI * fc);
+          const C3 = (9 * Math.sqrt(2)) / (16 * Math.PI * fc * z);
+          const L4 = (Math.sqrt(2) * z) / (3 * Math.PI * fc);
+          const C4 = Math.sqrt(2) / (8 * Math.PI * fc * z);
+          return { L1: L3, C1: C3, L2: L4, C2: C4, note: 'LR4（4次）' };
+        }
+      } else if (type === 'Butterworth') {
+        // Butterworth 2次の正確な計算式
+        if (isHP) {
+          const C1 = Math.sqrt(2) / (4 * Math.PI * fc * z);
+          const L2 = (Math.sqrt(2) * z) / (2 * Math.PI * fc);
+          return { C1, L1: undefined, C2: undefined, L2, note: 'Butterworth 2次' };
+        } else {
+          const L1 = (Math.sqrt(2) * z) / (2 * Math.PI * fc);
+          const C2 = Math.sqrt(2) / (4 * Math.PI * fc * z);
+          return { L1, C1: undefined, L2: undefined, C2, note: 'Butterworth 2次' };
+        }
+      } else if (type === 'Bessel') {
+        // Bessel 2次（暫定的にButterworthと同じ係数を使用）
+        if (isHP) {
+          const C1 = Math.sqrt(2) / (4 * Math.PI * fc * z);
+          const L2 = (Math.sqrt(2) * z) / (2 * Math.PI * fc);
+          return { C1, L1: undefined, C2: undefined, L2, note: 'Bessel 2次（暫定）' };
+        } else {
+          const L1 = (Math.sqrt(2) * z) / (2 * Math.PI * fc);
+          const C2 = Math.sqrt(2) / (4 * Math.PI * fc * z);
+          return { L1, C1: undefined, L2: undefined, C2, note: 'Bessel 2次（暫定）' };
         }
       }
       return { note: '未対応' };
