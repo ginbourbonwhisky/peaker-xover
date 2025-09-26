@@ -364,7 +364,8 @@
     lines.push('■ HP（Tweeter）素子値（理論）');
     if(hpPartsVals.C1 !== undefined) lines.push(`C1(series)：${fmtCap(hpPartsVals.C1)}`);
     if(hpPartsVals.L1 !== undefined) lines.push(`L1(shunt)：${fmtInd(hpPartsVals.L1)}`);
-    if(hpPartsVals.C2 !== undefined) lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}  ／  L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
+    if(hpPartsVals.C2 !== undefined) lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}`);
+    if(hpPartsVals.L2 !== undefined) lines.push(`L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
     lines.push('');
     lines.push('■ LP（Woofer）素子値（理論）');
     if(lpPartsVals.L1 !== undefined) lines.push(`L1(series)：${fmtInd(lpPartsVals.L1)}`);
