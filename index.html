@@ -96,7 +96,7 @@
   
   function dbToRatio(db){return Math.pow(10,db/20)}
   function ratioToDb(r){return 20*Math.log10(Math.max(r,1e-12))}
-  function lpad(z,att){const A=dbToRatio(att);if(A<=1)return{Rs:0,Rp:Infinity,Zin:z,A:1};const Rs=z*(A-1)/A;const Rp=z*A/(A-1);const Zin=Rs+1/(1/Rp+1/z);return{Rs,Rp,Zin,A}}
+  function lpad(z,att){const A=dbToRatio(att);if(A<=1)return{Rs:0,Rp:Infinity,Zin:z,A:1};const K=A;const Rs=z*(1-1/K);const Rp=z/(K-1);const Zin=Rs+1/(1/Rp+1/z);return{Rs,Rp,Zin,A}}
   
   // 抵抗スナップ機能（単一・直列・並列組合せ）
   function snapResistor(target, list = TAKMAN_RESISTORS) {
@@ -325,6 +325,7 @@
           const L2 = (Math.sqrt(2) * z) / (Math.PI * fc);
           return { C1, L1, C2, L2, note: 'LR4（4次）' };
         } else {
+          // LR4のLPは通常使用しないが、理論値として計算
           const L3 = (2 * Math.sqrt(2) * z) / (3 * Math.PI * fc);
           const C3 = (9 * Math.sqrt(2)) / (16 * Math.PI * fc * z);
           const L4 = (Math.sqrt(2) * z) / (3 * Math.PI * fc);
@@ -368,6 +369,7 @@
     lines.push('■ LP（Woofer）素子値（理論）');
     if(lpPartsVals.L1 !== undefined) lines.push(`L1(series)：${fmtInd(lpPartsVals.L1)}`);
     if(lpPartsVals.C1 !== undefined) lines.push(`C1(shunt)：${fmtCap(lpPartsVals.C1)}`);
+    if(lpPartsVals.C2 !== undefined) lines.push(`C2(shunt)：${fmtCap(lpPartsVals.C2)}`);
     if(lpPartsVals.L2 !== undefined) lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  ／  C2(shunt)：${fmtCap(lpPartsVals.C2)}  （${lpPartsVals.note}）`);
     el('results').textContent = lines.join('\n');
   }
