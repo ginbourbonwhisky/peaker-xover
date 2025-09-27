@@ -157,7 +157,41 @@
   }
   
   function estimateZobel(zNom,fc){const Re=0.8*zNom;const Le=zNom/(2*Math.PI*fc*5);const Rz=Re;const Cz=Le/(Rz*Rz);return{Re,Le,Rz,Cz}}
-  function autoPol(w,t){const evenW=(w==='LR2'||w==='LR4'||w==='Butterworth');const evenT=(t==='LR2'||t==='LR4'||t==='Butterworth');return (evenW&&evenT)?'invert':'normal'}
+  // 自動極性判定（合成フラットを最大化）
+  function autoPolarity(wooferType, tweeterType, fc) {
+    // 各フィルタの位相特性を計算
+    const wooferPhase = getFilterPhase(wooferType, fc, false); // LP
+    const tweeterPhase = getFilterPhase(tweeterType, fc, true);  // HP
+    
+    // クロス周波数での位相差を計算
+    const phaseDiff = Math.abs(tweeterPhase - wooferPhase);
+    
+    // 位相差が180度に近い場合は反転推奨
+    const shouldInvert = phaseDiff > 90 && phaseDiff < 270;
+    
+    return {
+      polarity: shouldInvert ? 'invert' : 'normal',
+      phaseDiff: phaseDiff,
+      wooferPhase: wooferPhase,
+      tweeterPhase: tweeterPhase,
+      reason: shouldInvert ? '位相差180°のため反転推奨' : '位相差が小さいため同相推奨'
+    };
+  }
+  
+  // フィルタの位相特性を計算（簡易モデル）
+  function getFilterPhase(type, fc, isHP) {
+    // クロス周波数での位相を計算
+    if (type === 'LR2') {
+      return isHP ? -90 : 90;  // HP: -90°, LP: +90°
+    } else if (type === 'LR4') {
+      return isHP ? -180 : 180; // HP: -180°, LP: +180°
+    } else if (type === 'Butterworth') {
+      return isHP ? -90 : 90;   // HP: -90°, LP: +90°
+    } else if (type === 'Bessel') {
+      return isHP ? -90 : 90;   // HP: -90°, LP: +90°
+    }
+    return 0;
+  }
   function fmtOhm(x){return x===Infinity?'∞':(Math.round(x*100)/100).toFixed(2)+' Ω'}
   function fmtCap(c){return (c*1e6).toFixed(3)+' µF'}
   function fmtInd(l){return (l*1e3).toFixed(3)+' mH'}
@@ -255,7 +289,8 @@
     const wIdealDb=wMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
     const tIdealDb=tMagIdeal.map(m=> ratioToDb(m) + (tspl-systemSPL));
     const tSnapDb=tMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - (lpadMode==='auto'? needAtt:0));
-    const invert = (autoPol(wtype,ttype)==='invert');
+    const polarityInfo = autoPolarity(wtype, ttype, fc);
+    const invert = (polarityInfo.polarity === 'invert');
     function sumDb(aDb,bDb,inv){ const a=dbToRatio(aDb), b=dbToRatio(bDb)*(inv?-1:1); const mag=Math.sqrt(Math.max(0,a*a+b*b)); return ratioToDb(mag); }
     const sumIdealDb=freq.map((_,i)=> sumDb(wIdealDb[i], tIdealDb[i], invert));
     const sumSnapDb=freq.map((_,i)=> sumDb(wIdealDb[i], tSnapDb[i], invert));
@@ -272,9 +307,15 @@
     lines.push(`・Zobel（Woofer補正）：${zbl? '使用（ON）':'未使用（OFF）'}`);
     lines.push(`・L-pad（Tweeter減衰）：${lpadMode==='auto'? '約−'+needAtt.toFixed(1)+' dB（定インピ）':'OFF'}`);
     lines.push('---\n');
+    
+    // 自動極性判定（既に計算済み）
     lines.push(`■ 配線順（概略）:   HP（Tweeter） ${slopeText(ttype)}  ｜  LP（Woofer） ${slopeText(wtype)}`);
+    lines.push(`極性判定: ${polarityInfo.polarity === 'invert' ? 'ツイーター反転推奨' : '同相推奨'} (${polarityInfo.reason})`);
+    lines.push(`位相差: HP ${polarityInfo.tweeterPhase}° / LP ${polarityInfo.wooferPhase}° (差: ${polarityInfo.phaseDiff}°)`);
+    
     const hpWire=wiringForHP(ttype); const lpw=wiringForLP(wtype);
-    lines.push(formatWiringLine('[入力(＋)] → HP：', hpWire, ' → L-pad(Rs→Rp) → Tweeter(＋)'));
+    const polarityMark = polarityInfo.polarity === 'invert' ? ' [反転]' : '';
+    lines.push(formatWiringLine('[入力(＋)] → HP：', hpWire, ` → L-pad(Rs→Rp) → Tweeter(＋)${polarityMark}`));
     lines.push(formatWiringLine('           → LP：', lpw, ' → Woofer(＋) ／ Woofer端子＋−間に [Rz−Cz直列] を並列（Zobel）'));
     lines.push('[入力(−)] → Tweeter(−), Woofer(−)\n');
     lines.push('■ L-pad（ツイーター減衰）');
