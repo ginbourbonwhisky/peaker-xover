@@ -157,52 +157,148 @@
   }
   
   function estimateZobel(zNom,fc){const Re=0.8*zNom;const Le=zNom/(2*Math.PI*fc*5);const Rz=Re;const Cz=Le/(Rz*Rz);return{Re,Le,Rz,Cz}}
-  // 自動極性判定（合成フラットを最大化）
-  function autoPolarity(wooferType, tweeterType, fc) {
-    // 各フィルタの位相特性を計算
-    const wooferPhase = getFilterPhase(wooferType, fc, false); // LP
-    const tweeterPhase = getFilterPhase(tweeterType, fc, true);  // HP
-    
-    // クロス周波数での位相差を計算
-    const phaseDiff = Math.abs(tweeterPhase - wooferPhase);
-    
-    // 理論値に基づく判定
-    let shouldInvert = false;
-    let reason = '';
-    
-    if (wooferType === 'LR4' && tweeterType === 'LR4') {
-      // LR4 + LR4: 0°差 → 同相
-      shouldInvert = false;
-      reason = 'LR4同士は0°差のため同相推奨';
-    } else if (wooferType === 'LR2' && tweeterType === 'LR2') {
-      // LR2 + LR2: 180°差 → 反転
-      shouldInvert = true;
-      reason = 'LR2同士は180°差のため反転推奨';
-    } else if (wooferType === 'Butterworth' && tweeterType === 'Butterworth') {
-      // Butterworth + Butterworth: 180°差 → 反転
-      shouldInvert = true;
-      reason = 'Butterworth同士は180°差のため反転推奨';
-    } else if (wooferType === 'Bessel' && tweeterType === 'Bessel') {
-      // Bessel + Bessel: 180°差 → 反転
-      shouldInvert = true;
-      reason = 'Bessel同士は180°差のため反転推奨';
-    } else {
-      // 非対称組み合わせ: 位相差で判定
-      if (phaseDiff > 90 && phaseDiff < 270) {
-        shouldInvert = true;
-        reason = `位相差${phaseDiff}°のため反転推奨`;
-      } else {
-        shouldInvert = false;
-        reason = `位相差${phaseDiff}°のため同相推奨`;
-      }
+  // 複素数クラス（簡易版）
+  class Complex {
+    constructor(real, imag) {
+      this.real = real;
+      this.imag = imag;
     }
+    
+    add(other) {
+      return new Complex(this.real + other.real, this.imag + other.imag);
+    }
+    
+    multiply(other) {
+      if (typeof other === 'number') {
+        return new Complex(this.real * other, this.imag * other);
+      }
+      return new Complex(
+        this.real * other.real - this.imag * other.imag,
+        this.real * other.imag + this.imag * other.real
+      );
+    }
+    
+    divide(other) {
+      if (typeof other === 'number') {
+        return new Complex(this.real / other, this.imag / other);
+      }
+      const denom = other.real * other.real + other.imag * other.imag;
+      return new Complex(
+        (this.real * other.real + this.imag * other.imag) / denom,
+        (this.imag * other.real - this.real * other.imag) / denom
+      );
+    }
+    
+    phase() {
+      return Math.atan2(this.imag, this.real);
+    }
+    
+    magnitude() {
+      return Math.sqrt(this.real * this.real + this.imag * this.imag);
+    }
+  }
+  
+  // 伝達関数の計算
+  function getTransferFunction(type, s, isHP) {
+    if (type === 'LR2') {
+      const den = s.multiply(s).add(s.multiply(2)).add(1); // (s+1)²
+      return isHP ? s.multiply(s).divide(den) : new Complex(1, 0).divide(den);
+    } else if (type === 'LR4') {
+      const sqrt2 = Math.sqrt(2);
+      const den2 = s.multiply(s).add(s.multiply(sqrt2)).add(1); // s²+√2s+1
+      const den = den2.multiply(den2); // (s²+√2s+1)²
+      return isHP ? s.multiply(s).multiply(s).multiply(s).divide(den) : new Complex(1, 0).divide(den);
+    } else if (type === 'Butterworth') {
+      const sqrt2 = Math.sqrt(2);
+      const den = s.multiply(s).add(s.multiply(sqrt2)).add(1); // s²+√2s+1
+      return isHP ? s.multiply(s).divide(den) : new Complex(1, 0).divide(den);
+    } else if (type === 'Bessel') {
+      const den = s.multiply(s).add(s.multiply(3)).add(3); // s²+3s+3
+      return isHP ? s.multiply(s).divide(den) : new Complex(3, 0).divide(den);
+    }
+    return new Complex(1, 0);
+  }
+  
+  // 周波数特性のリップル誤差評価
+  function evaluateRippleError(fc, wooferType, tweeterType, attDb, dxM, polarityRad) {
+    const f_lo = fc / Math.sqrt(2);
+    const f_hi = fc * Math.sqrt(2);
+    const n = 21; // サンプル数
+    
+    let err = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const f = Math.exp(Math.log(f_lo) * (1 - t) + Math.log(f_hi) * t);
+      
+      const s = new Complex(0, f / fc);
+      const H_LP = getTransferFunction(wooferType, s, false);
+      const H_HP = getTransferFunction(tweeterType, s, true);
+      
+      // L-pad減衰
+      const K = Math.pow(10, attDb / 20.0);
+      const G_pad = 1.0 / K;
+      
+      // 物理オフセット
+      const C_SOUND = 343.0;
+      const phi_delay = 2 * Math.PI * f * dxM / C_SOUND;
+      const G_delay = new Complex(Math.cos(phi_delay), Math.sin(phi_delay));
+      
+      const A_HP = H_HP.multiply(G_pad).multiply(G_delay);
+      const A_LP = H_LP;
+      
+      // 極性を考慮した合成
+      const polarity = new Complex(Math.cos(polarityRad), Math.sin(polarityRad));
+      const H_sum = A_LP.add(A_HP.multiply(polarity));
+      
+      // dB偏差の二乗
+      const magDb = 20 * Math.log10(H_sum.magnitude());
+      err += magDb * magDb;
+    }
+    
+    return err / n;
+  }
+  
+  // 高度な極性判定（伝達関数ベース、周波数特性評価）
+  function autoPolarity(wooferType, tweeterType, fc, attDb = 0, dxM = 0) {
+    // 伝達関数ベースの位相計算
+    const s = new Complex(0, 1); // s = j (正規化周波数)
+    
+    const H_LP = getTransferFunction(wooferType, s, false); // LP
+    const H_HP = getTransferFunction(tweeterType, s, true);  // HP
+    
+    // L-pad減衰（位相0°のゲイン）
+    const K = Math.pow(10, attDb / 20.0);
+    const G_pad = 1.0 / K;
+    
+    // 物理オフセット（到達遅延）
+    const C_SOUND = 343.0; // m/s
+    const phi_delay = 2 * Math.PI * fc * dxM / C_SOUND;
+    const G_delay = new Complex(Math.cos(phi_delay), Math.sin(phi_delay));
+    
+    // 合成応答
+    const A_HP = H_HP.multiply(G_pad).multiply(G_delay);
+    const A_LP = H_LP;
+    
+    // クロス周波数での位相差
+    const phaseDiff = Math.abs(A_HP.phase() - A_LP.phase()) * 180 / Math.PI;
+    
+    // 周波数特性のフラット性評価
+    const score0 = evaluateRippleError(fc, wooferType, tweeterType, attDb, dxM, 0);
+    const score180 = evaluateRippleError(fc, wooferType, tweeterType, attDb, dxM, Math.PI);
+    
+    const shouldInvert = score180 < score0;
+    const reason = shouldInvert ? 
+      `周波数特性評価で反転が優位 (0°: ${score0.toFixed(2)}, 180°: ${score180.toFixed(2)})` :
+      `周波数特性評価で同相が優位 (0°: ${score0.toFixed(2)}, 180°: ${score180.toFixed(2)})`;
     
     return {
       polarity: shouldInvert ? 'invert' : 'normal',
       phaseDiff: phaseDiff,
-      wooferPhase: wooferPhase,
-      tweeterPhase: tweeterPhase,
-      reason: reason
+      wooferPhase: A_LP.phase() * 180 / Math.PI,
+      tweeterPhase: A_HP.phase() * 180 / Math.PI,
+      reason: reason,
+      score0: score0,
+      score180: score180
     };
   }
   
@@ -317,7 +413,7 @@
     const wIdealDb=wMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
     const tIdealDb=tMagIdeal.map(m=> ratioToDb(m) + (tspl-systemSPL));
     const tSnapDb=tMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - (lpadMode==='auto'? needAtt:0));
-    const polarityInfo = autoPolarity(wtype, ttype, fc);
+    const polarityInfo = autoPolarity(wtype, ttype, fc, lpadMode==='auto'? needAtt:0, 0);
     const invert = (polarityInfo.polarity === 'invert');
     function sumDb(aDb,bDb,inv){ const a=dbToRatio(aDb), b=dbToRatio(bDb)*(inv?-1:1); const mag=Math.sqrt(Math.max(0,a*a+b*b)); return ratioToDb(mag); }
     const sumIdealDb=freq.map((_,i)=> sumDb(wIdealDb[i], tIdealDb[i], invert));
