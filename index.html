@@ -149,9 +149,9 @@
     if (optimal.type === 'single') {
       return `${optimal.value}Ω (単一)`;
     } else if (optimal.type === 'series') {
-      return `${optimal.value}Ω (${optimal.combination[0]}Ω + ${optimal.combination[1]}Ω)`;
+      return `${optimal.value}Ω (${optimal.combination[0]}Ω + ${optimal.combination[1]}Ω 直列)`;
     } else if (optimal.type === 'parallel') {
-      return `${optimal.value}Ω (${optimal.combination[0]}Ω || ${optimal.combination[1]}Ω)`;
+      return `${optimal.value}Ω (${optimal.combination[0]}Ω || ${optimal.combination[1]}Ω 並列)`;
     }
     return `${optimal.value}Ω`;
   }
