@@ -344,15 +344,15 @@
           return { L1, C1: undefined, L2: undefined, C2, note: 'Butterworth 2次' };
         }
       } else if (type === 'Bessel') {
-        // Bessel 2次（暫定的にButterworthと同じ係数を使用）
+        // Bessel 2次の正確な係数
         if (isHP) {
-          const C1 = Math.sqrt(2) / (4 * Math.PI * fc * z);
-          const L2 = (Math.sqrt(2) * z) / (2 * Math.PI * fc);
-          return { C1, L1: undefined, C2: undefined, L2, note: 'Bessel 2次（暫定）' };
+          const C1 = 0.0912 / (z * fc);
+          const L2 = (0.2756 * z) / fc;
+          return { C1, L1: undefined, C2: undefined, L2, note: 'Bessel 2次' };
         } else {
-          const L1 = (Math.sqrt(2) * z) / (2 * Math.PI * fc);
-          const C2 = Math.sqrt(2) / (4 * Math.PI * fc * z);
-          return { L1, C1: undefined, L2: undefined, C2, note: 'Bessel 2次（暫定）' };
+          const L1 = (0.2756 * z) / fc;
+          const C2 = 0.0912 / (z * fc);
+          return { L1, C1: undefined, L2: undefined, C2, note: 'Bessel 2次' };
         }
       }
       return { note: '未対応' };
