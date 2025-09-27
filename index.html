@@ -368,10 +368,34 @@
     if(hpPartsVals.L2 !== undefined) lines.push(`L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
     lines.push('');
     lines.push('■ LP（Woofer）素子値（理論）');
-    if(lpPartsVals.L1 !== undefined) lines.push(`L1(series)：${fmtInd(lpPartsVals.L1)}`);
-    if(lpPartsVals.C1 !== undefined) lines.push(`C1(shunt)：${fmtCap(lpPartsVals.C1)}`);
-    if(lpPartsVals.C2 !== undefined) lines.push(`C2(shunt)：${fmtCap(lpPartsVals.C2)}`);
-    if(lpPartsVals.L2 !== undefined) lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  （${lpPartsVals.note}）`);
+    if(lpPartsVals.L1 !== undefined) {
+      if(wtype === 'LR2') {
+        lines.push(`L(series)：${fmtInd(lpPartsVals.L1)}`);
+      } else {
+        lines.push(`L1(series)：${fmtInd(lpPartsVals.L1)}`);
+      }
+    }
+    if(lpPartsVals.C1 !== undefined) {
+      if(wtype === 'LR2') {
+        lines.push(`C(shunt)：${fmtCap(lpPartsVals.C1)}`);
+      } else {
+        lines.push(`C1(shunt)：${fmtCap(lpPartsVals.C1)}`);
+      }
+    }
+    if(lpPartsVals.C2 !== undefined) {
+      if(wtype === 'LR2') {
+        lines.push(`C(shunt)：${fmtCap(lpPartsVals.C2)}`);
+      } else {
+        lines.push(`C2(shunt)：${fmtCap(lpPartsVals.C2)}`);
+      }
+    }
+    if(lpPartsVals.L2 !== undefined) {
+      if(wtype === 'LR2') {
+        lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  （${lpPartsVals.note}）`);
+      } else {
+        lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  （${lpPartsVals.note}）`);
+      }
+    }
     el('results').textContent = lines.join('\n');
   }
   ['show-woo','show-twe','show-sum','show-snapped','show-delta','show-imp'].forEach(function(id){ el(id).addEventListener('change', run); });
