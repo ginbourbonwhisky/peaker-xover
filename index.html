@@ -363,28 +363,28 @@
     
     lines.push('■ HP（Tweeter）素子値（理論）');
     if(hpPartsVals.C1 !== undefined) {
-      if(ttype === 'Butterworth' || ttype === 'Bessel') {
+      if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
         lines.push(`C(series)：${fmtCap(hpPartsVals.C1)}`);
       } else {
         lines.push(`C1(series)：${fmtCap(hpPartsVals.C1)}`);
       }
     }
     if(hpPartsVals.L1 !== undefined) {
-      if(ttype === 'Butterworth' || ttype === 'Bessel') {
+      if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
         lines.push(`L(shunt)：${fmtInd(hpPartsVals.L1)}`);
       } else {
         lines.push(`L1(shunt)：${fmtInd(hpPartsVals.L1)}`);
       }
     }
     if(hpPartsVals.C2 !== undefined) {
-      if(ttype === 'Butterworth' || ttype === 'Bessel') {
+      if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
         lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}`);
       } else {
         lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}`);
       }
     }
     if(hpPartsVals.L2 !== undefined) {
-      if(ttype === 'Butterworth' || ttype === 'Bessel') {
+      if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
         lines.push(`L(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
       } else {
         lines.push(`L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
