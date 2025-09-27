@@ -362,35 +362,59 @@
     const lpPartsVals = calcFilterComponents(wtype, wz, fc, false);
     
     lines.push('■ HP（Tweeter）素子値（理論）');
-    if(hpPartsVals.C1 !== undefined) lines.push(`C1(series)：${fmtCap(hpPartsVals.C1)}`);
-    if(hpPartsVals.L1 !== undefined) lines.push(`L1(shunt)：${fmtInd(hpPartsVals.L1)}`);
-    if(hpPartsVals.C2 !== undefined) lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}`);
-    if(hpPartsVals.L2 !== undefined) lines.push(`L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
+    if(hpPartsVals.C1 !== undefined) {
+      if(ttype === 'Butterworth' || ttype === 'Bessel') {
+        lines.push(`C(series)：${fmtCap(hpPartsVals.C1)}`);
+      } else {
+        lines.push(`C1(series)：${fmtCap(hpPartsVals.C1)}`);
+      }
+    }
+    if(hpPartsVals.L1 !== undefined) {
+      if(ttype === 'Butterworth' || ttype === 'Bessel') {
+        lines.push(`L(shunt)：${fmtInd(hpPartsVals.L1)}`);
+      } else {
+        lines.push(`L1(shunt)：${fmtInd(hpPartsVals.L1)}`);
+      }
+    }
+    if(hpPartsVals.C2 !== undefined) {
+      if(ttype === 'Butterworth' || ttype === 'Bessel') {
+        lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}`);
+      } else {
+        lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}`);
+      }
+    }
+    if(hpPartsVals.L2 !== undefined) {
+      if(ttype === 'Butterworth' || ttype === 'Bessel') {
+        lines.push(`L(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
+      } else {
+        lines.push(`L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
+      }
+    }
     lines.push('');
     lines.push('■ LP（Woofer）素子値（理論）');
     if(lpPartsVals.L1 !== undefined) {
-      if(wtype === 'LR2') {
+      if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
         lines.push(`L(series)：${fmtInd(lpPartsVals.L1)}`);
       } else {
         lines.push(`L1(series)：${fmtInd(lpPartsVals.L1)}`);
       }
     }
     if(lpPartsVals.C1 !== undefined) {
-      if(wtype === 'LR2') {
+      if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
         lines.push(`C(shunt)：${fmtCap(lpPartsVals.C1)}`);
       } else {
         lines.push(`C1(shunt)：${fmtCap(lpPartsVals.C1)}`);
       }
     }
     if(lpPartsVals.C2 !== undefined) {
-      if(wtype === 'LR2') {
+      if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
         lines.push(`C(shunt)：${fmtCap(lpPartsVals.C2)}`);
       } else {
         lines.push(`C2(shunt)：${fmtCap(lpPartsVals.C2)}`);
       }
     }
     if(lpPartsVals.L2 !== undefined) {
-      if(wtype === 'LR2') {
+      if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
         lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  （${lpPartsVals.note}）`);
       } else {
         lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  （${lpPartsVals.note}）`);
