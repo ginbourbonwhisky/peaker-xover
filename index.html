@@ -166,29 +166,57 @@
     // クロス周波数での位相差を計算
     const phaseDiff = Math.abs(tweeterPhase - wooferPhase);
     
-    // 位相差が180度に近い場合は反転推奨
-    const shouldInvert = phaseDiff > 90 && phaseDiff < 270;
+    // 理論値に基づく判定
+    let shouldInvert = false;
+    let reason = '';
+    
+    if (wooferType === 'LR4' && tweeterType === 'LR4') {
+      // LR4 + LR4: 0°差 → 同相
+      shouldInvert = false;
+      reason = 'LR4同士は0°差のため同相推奨';
+    } else if (wooferType === 'LR2' && tweeterType === 'LR2') {
+      // LR2 + LR2: 180°差 → 反転
+      shouldInvert = true;
+      reason = 'LR2同士は180°差のため反転推奨';
+    } else if (wooferType === 'Butterworth' && tweeterType === 'Butterworth') {
+      // Butterworth + Butterworth: 180°差 → 反転
+      shouldInvert = true;
+      reason = 'Butterworth同士は180°差のため反転推奨';
+    } else if (wooferType === 'Bessel' && tweeterType === 'Bessel') {
+      // Bessel + Bessel: 180°差 → 反転
+      shouldInvert = true;
+      reason = 'Bessel同士は180°差のため反転推奨';
+    } else {
+      // 非対称組み合わせ: 位相差で判定
+      if (phaseDiff > 90 && phaseDiff < 270) {
+        shouldInvert = true;
+        reason = `位相差${phaseDiff}°のため反転推奨`;
+      } else {
+        shouldInvert = false;
+        reason = `位相差${phaseDiff}°のため同相推奨`;
+      }
+    }
     
     return {
       polarity: shouldInvert ? 'invert' : 'normal',
       phaseDiff: phaseDiff,
       wooferPhase: wooferPhase,
       tweeterPhase: tweeterPhase,
-      reason: shouldInvert ? '位相差180°のため反転推奨' : '位相差が小さいため同相推奨'
+      reason: reason
     };
   }
   
-  // フィルタの位相特性を計算（簡易モデル）
+  // フィルタの位相特性を計算（理論値ベース）
   function getFilterPhase(type, fc, isHP) {
-    // クロス周波数での位相を計算
+    // クロス周波数での位相を計算（理論値）
     if (type === 'LR2') {
-      return isHP ? -90 : 90;  // HP: -90°, LP: +90°
+      return isHP ? -90 : 90;  // HP: -90°, LP: +90° → 180°差
     } else if (type === 'LR4') {
-      return isHP ? -180 : 180; // HP: -180°, LP: +180°
+      return isHP ? 180 : 180; // HP: 180°, LP: 180° → 0°差（同相）
     } else if (type === 'Butterworth') {
-      return isHP ? -90 : 90;   // HP: -90°, LP: +90°
+      return isHP ? -90 : 90;   // HP: -90°, LP: +90° → 180°差
     } else if (type === 'Bessel') {
-      return isHP ? -90 : 90;   // HP: -90°, LP: +90°
+      return isHP ? -60 : 120;  // HP: -60°, LP: +120° → 180°差
     }
     return 0;
   }
