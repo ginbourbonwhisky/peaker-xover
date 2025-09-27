@@ -338,7 +338,17 @@
     } else { lines.push('OFF'); }
     lines.push('');
     lines.push('■ Zobel（Woofer補正）');
-    if (zbl){ lines.push(`Rz = ${fmtOhm(zbl.Rz)}`); lines.push(`Cz = ${fmtCap(zbl.Cz)}（Re/Le内部推定）`); } else { lines.push('未適用'); }
+    if (zbl){ 
+      lines.push(`理論 Rz: ${fmtOhm(zbl.Rz)}`);
+      lines.push(`理論 Cz: ${fmtCap(zbl.Cz)}（Re/Le内部推定）`);
+      
+      // Zobel抵抗の実用値スナップ
+      const RzOptimal = findOptimalResistorCombination(zbl.Rz);
+      lines.push(`実用 Rz: ${formatResistorCombination(RzOptimal)}`);
+      lines.push(`実用 Cz: ${fmtCap(zbl.Cz)}（理論値のまま）`);
+    } else { 
+      lines.push('未適用'); 
+    }
     lines.push('');
     // フィルタ素子の理論値（正確な係数ベース）
     const twoPi = 2*Math.PI;
