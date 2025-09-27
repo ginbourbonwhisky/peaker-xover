@@ -147,13 +147,13 @@
   // 抵抗組合せの表示フォーマット
   function formatResistorCombination(optimal) {
     if (optimal.type === 'single') {
-      return `${optimal.value}Ω (単一)`;
+      return `${(Math.round(optimal.value * 100) / 100).toFixed(2)}Ω (単一)`;
     } else if (optimal.type === 'series') {
-      return `${optimal.value}Ω (${optimal.combination[0]}Ω + ${optimal.combination[1]}Ω 直列)`;
+      return `${(Math.round(optimal.value * 100) / 100).toFixed(2)}Ω (${optimal.combination[0]}Ω + ${optimal.combination[1]}Ω 直列)`;
     } else if (optimal.type === 'parallel') {
-      return `${optimal.value}Ω (${optimal.combination[0]}Ω || ${optimal.combination[1]}Ω 並列)`;
+      return `${(Math.round(optimal.value * 100) / 100).toFixed(2)}Ω (${optimal.combination[0]}Ω || ${optimal.combination[1]}Ω 並列)`;
     }
-    return `${optimal.value}Ω`;
+    return `${(Math.round(optimal.value * 100) / 100).toFixed(2)}Ω`;
   }
   
   function estimateZobel(zNom,fc){const Re=0.8*zNom;const Le=zNom/(2*Math.PI*fc*5);const Rz=Re;const Cz=Le/(Rz*Rz);return{Re,Le,Rz,Cz}}
