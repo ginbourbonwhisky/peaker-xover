@@ -34,7 +34,10 @@
     <input id="target-spl" type="number" step="0.1" placeholder="例: 90.0">
   </label>
   <label>クロス周波数(Hz)
-    <input id="fc1" type="number" value="1800">
+    <input id="fc1" type="number" value="1800" placeholder="2-way: fc1">
+  </label>
+  <label id="fc2-wrap" style="display:none;">クロス周波数2(Hz)
+    <input id="fc2" type="number" value="500" placeholder="3-way: fc2 (Low-Mid)">
   </label>
 </div>
 
@@ -47,6 +50,18 @@
   </label>
   <label>Zobel（Re/Le自動推定）
     <select id="wzobel"><option value="on" selected>ON</option><option value="off">OFF</option></select>
+  </label>
+</div>
+
+<h3 id="mid-section" style="display:none;">Mid（Mid-range）</h3>
+<div id="mid-row" class="row" style="display:none;">
+  <label>Ω<input id="mz" type="number" value="8"></label>
+  <label>dB<input id="mspl" type="number" value="92" step="0.1"></label>
+  <label>特性
+    <select id="mtype"><option>LR2</option><option selected>LR4</option><option>Butterworth</option><option>Bessel</option></select>
+  </label>
+  <label>Mid減衰（自動・名目Z維持）
+    <select id="mlpad"><option value="auto" selected>自動</option><option value="off">OFF</option></select>
   </label>
 </div>
 
@@ -69,10 +84,11 @@
   <fieldset class="toggles">
     <legend>グラフ表示</legend>
     <label><input type="checkbox" id="show-woo" checked> Woofer</label>
+    <label id="show-mid-label" style="display:none;"><input type="checkbox" id="show-mid" checked> Mid-range</label>
     <label><input type="checkbox" id="show-twe" checked> Tweeter</label>
     <label><input type="checkbox" id="show-sum" checked> Sum</label>
-    <label><input type="checkbox" id="show-snapped" checked> スナップ後（実用値）</label>
-    <label><input type="checkbox" id="show-delta"> 差分（理想−スナップ後）</label>
+    <label id="show-snapped-label"><input type="checkbox" id="show-snapped" checked> スナップ後（実用値）</label>
+    <label id="show-delta-label"><input type="checkbox" id="show-delta"> 差分（理想−スナップ後）</label>
     <label><input type="checkbox" id="show-acoustic"> 音響合成</label>
     <label><input type="checkbox" id="show-imp" checked> インピーダンスZ</label>
   </fieldset>
@@ -482,79 +498,211 @@
       }
     });
   }
+  
+  function draw3Way(freq, series, toggles) {
+    const ctx=el('plot').getContext('2d');
+    if(chart)chart.destroy();
+    const ds=[];
+    if(toggles.showWoo)ds.push({label:'Woofer',data:series.wIdeal,borderColor:'#d33',pointRadius:0});
+    if(toggles.showMid)ds.push({label:'Mid-range',data:series.mIdeal,borderColor:'#0a6',pointRadius:0});
+    if(toggles.showTwe)ds.push({label:'Tweeter',data:series.tIdeal,borderColor:'#06c',pointRadius:0});
+    if(toggles.showSum)ds.push({label:'Sum',data:series.sumIdeal,borderColor:'#000',pointRadius:0});
+    if(toggles.showAcoustic){
+      if(toggles.showWoo)ds.push({label:'Woofer（音響合成）',data:series.wAcoustic,borderColor:'#a33',pointRadius:0,borderDash:[8,4]});
+      if(toggles.showMid)ds.push({label:'Mid-range（音響合成）',data:series.mAcoustic,borderColor:'#3a6',pointRadius:0,borderDash:[8,4]});
+      if(toggles.showTwe)ds.push({label:'Tweeter（音響合成）',data:series.tAcoustic,borderColor:'#33a',pointRadius:0,borderDash:[8,4]});
+    }
+    chart=new Chart(ctx,{
+      type:'line',
+      data:{ labels:freq, datasets:ds },
+      options:{
+        responsive:true,
+        interaction:{ mode:'nearest', intersect:false },
+        plugins:{ legend:{ position:'bottom' } },
+        scales:{
+          x:{ type:'logarithmic', min:20, max:40000, ticks:{ callback:function(v){ return v; } }, title:{ display:true, text:'Hz' } },
+          y:{ title:{ display:true, text:'dB' }, min:-20, max:20 }
+        }
+      }
+    });
+  }
+  
   function run(){
     const system=el('system').value;
+    const is3way = system === '3way';
+    
+    // 2-way/3-way共通パラメータ
     const wz=+el('wz').value||8, wspl=+el('wspl').value||90, wtype=el('wtype').value;
     const tz=+el('tz').value||8, tspl=+el('tspl').value||98, ttype=el('ttype').value;
-    const fc=+el('fc1').value||1800;
+    const fc1=+el('fc1').value||1800;
     const basis=el('spl-basis').value;
-    let systemSPL=Math.min(wspl,tspl);
+    
+    // 3-way専用パラメータ
+    let mz=8, mspl=92, mtype='LR4', mlpadMode='auto', fc2=500;
+    if (is3way) {
+      mz=+el('mz').value||8;
+      mspl=+el('mspl').value||92;
+      mtype=el('mtype').value;
+      mlpadMode=el('mlpad').value;
+      fc2=+el('fc2').value||500;
+    }
+    
+    // システムSPL計算
+    let systemSPL = Math.min(wspl, tspl);
+    if (is3way) systemSPL = Math.min(systemSPL, mspl);
+    
     let basisText='最小能率';
     if(basis==='targetSystemSPL'){
       const t=+el('target-spl').value; if(t>0){ systemSPL=Math.min(t,systemSPL); basisText=`手動入力（${t.toFixed(1)} dB）`; }
     }
+    
+    // L-pad計算
     const lpadMode=el('tlpad').value;
     const needAtt=Math.max(0, tspl-systemSPL);
     const lp=(lpadMode==='auto')? lpad(tz, needAtt) : {Rs:0,Rp:Infinity,Zin:tz,A:1};
+    
+    // Mid L-pad計算（3-way時）
+    let mlp = {Rs:0,Rp:Infinity,Zin:mz,A:1};
+    let mneedAtt = 0;
+    if (is3way) {
+      mneedAtt = Math.max(0, mspl-systemSPL);
+      mlp = (mlpadMode==='auto')? lpad(mz, mneedAtt) : {Rs:0,Rp:Infinity,Zin:mz,A:1};
+    }
     // 古いsnapR関数の呼び出しを新しいfindOptimalResistorCombinationに置き換え
     const RsSnap=(lpadMode==='auto'&&lp.Rs>0)? findOptimalResistorCombination(lp.Rs):null;
     const RpSnap=(lpadMode==='auto'&&isFinite(lp.Rp))? findOptimalResistorCombination(lp.Rp):null;
     const ZinSnap=(lpadMode==='auto'&&RsSnap&&RpSnap)? (RsSnap.value+1/(1/RpSnap.value+1/tz)) : lp.Zin;
-    const zbl=(el('wzobel').value==='on')? estimateZobel(wz,fc):null;
+    const zbl=(el('wzobel').value==='on')? estimateZobel(wz,fc1):null;
     const freq=genFreq();
-    const wMag=freq.map(f=> magLP(wtype,f,fc));
-    const tMagIdeal=freq.map(f=> magHP(ttype,f,fc));
     
-    // 音響合成（電気フィルタ + ドライバ音響特性）
-    const wAcousticMag=freq.map(f=> acousticResponseLP(wtype,f,fc));
-    const tAcousticMag=freq.map(f=> acousticResponseHP(ttype,f,fc));
-    
-    // L-pad減衰はdB側で適用（二重適用防止のため振幅には掛けない）
-    const tMag=tMagIdeal;
+    if (is3way) {
+      // 3-way計算
+      const wMag=freq.map(f=> magLP(wtype,f,fc2)); // Low-Mid crossover
+      const mMag=freq.map((f,i)=> magLP(mtype,f,fc1) * magHP(mtype,f,fc2)); // Mid bandpass
+      const tMagIdeal=freq.map(f=> magHP(ttype,f,fc1)); // Mid-High crossover
+      
+      // 音響合成
+      const wAcousticMag=freq.map(f=> acousticResponseLP(wtype,f,fc2));
+      const mAcousticMag=freq.map(f=> acousticResponseLP(mtype,f,fc1) * acousticResponseHP(mtype,f,fc2));
+      const tAcousticMag=freq.map(f=> acousticResponseHP(ttype,f,fc1));
+      
+      // dB値計算
+      const wIdealDb=wMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
+      const mIdealDb=mMag.map(m=> ratioToDb(m) + (mspl-systemSPL) - mneedAtt);
+      const tIdealDb=tMagIdeal.map(m=> ratioToDb(m) + (tspl-systemSPL) - needAtt);
+      
+      const wAcousticDb=wAcousticMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
+      const mAcousticDb=mAcousticMag.map(m=> ratioToDb(m) + (mspl-systemSPL) - mneedAtt);
+      const tAcousticDb=tAcousticMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - needAtt);
+      
+      // 3-way合成（簡略化：同相合成）
+      const sumIdealDb=freq.map((_,i)=> ratioToDb(dbToRatio(wIdealDb[i]) + dbToRatio(mIdealDb[i]) + dbToRatio(tIdealDb[i])));
+      
+      // グラフ描画（3-way）
+      draw3Way(freq,{ wIdeal:wIdealDb, mIdeal:mIdealDb, tIdeal:tIdealDb, sumIdeal:sumIdealDb, wAcoustic:wAcousticDb, mAcoustic:mAcousticDb, tAcoustic:tAcousticDb },{ showWoo:el('show-woo').checked, showMid:el('show-mid').checked, showTwe:el('show-twe').checked, showSum:el('show-sum').checked, showAcoustic:el('show-acoustic').checked });
+      
+    } else {
+      // 2-way計算（既存ロジック）
+      const wMag=freq.map(f=> magLP(wtype,f,fc1));
+      const tMagIdeal=freq.map(f=> magHP(ttype,f,fc1));
+      
+      // 音響合成（電気フィルタ + ドライバ音響特性）
+      const wAcousticMag=freq.map(f=> acousticResponseLP(wtype,f,fc1));
+      const tAcousticMag=freq.map(f=> acousticResponseHP(ttype,f,fc1));
+      
+      // L-pad減衰はdB側で適用（二重適用防止のため振幅には掛けない）
+      const tMag=tMagIdeal;
     const wIdealDb=wMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
     const tIdealDb=tMagIdeal.map(m=> ratioToDb(m) + (tspl-systemSPL));
     const tSnapDb=tMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - (lpadMode==='auto'? needAtt:0));
-    
-    // 音響合成のdB値
-    const wAcousticDb=wAcousticMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
-    const tAcousticDb=tAcousticMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - (lpadMode==='auto'? needAtt:0));
-    const polarityInfo = autoPolarity(wtype, ttype, fc, lpadMode==='auto'? needAtt:0, 0);
-    const invert = (polarityInfo.polarity === 'invert');
+      
+      // 音響合成のdB値
+      const wAcousticDb=wAcousticMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
+      const tAcousticDb=tAcousticMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - (lpadMode==='auto'? needAtt:0));
+      const polarityInfo = autoPolarity(wtype, ttype, fc1, lpadMode==='auto'? needAtt:0, 0);
+      const invert = (polarityInfo.polarity === 'invert');
     function sumDb(aDb,bDb,inv){ const a=dbToRatio(aDb), b=dbToRatio(bDb)*(inv?-1:1); const mag=Math.sqrt(Math.max(0,a*a+b*b)); return ratioToDb(mag); }
     const sumIdealDb=freq.map((_,i)=> sumDb(wIdealDb[i], tIdealDb[i], invert));
     const sumSnapDb=freq.map((_,i)=> sumDb(wIdealDb[i], tSnapDb[i], invert));
     const deltaDb=freq.map((_,i)=> sumIdealDb[i]-sumSnapDb[i]);
-    draw2Way(freq,{ wIdeal:wIdealDb, tIdeal:tIdealDb, sumIdeal:sumIdealDb, wSnap:wIdealDb, tSnap:tSnapDb, sumSnap:sumSnapDb, delta:deltaDb, wAcoustic:wAcousticDb, tAcoustic:tAcousticDb },{ showWoo:el('show-woo').checked, showTwe:el('show-twe').checked, showSum:el('show-sum').checked, showSnapped:el('show-snapped').checked, showDelta:el('show-delta').checked, showAcoustic:el('show-acoustic').checked });
+      draw2Way(freq,{ wIdeal:wIdealDb, tIdeal:tIdealDb, sumIdeal:sumIdealDb, wSnap:wIdealDb, tSnap:tSnapDb, sumSnap:sumSnapDb, delta:deltaDb, wAcoustic:wAcousticDb, tAcoustic:tAcousticDb },{ showWoo:el('show-woo').checked, showTwe:el('show-twe').checked, showSum:el('show-sum').checked, showSnapped:el('show-snapped').checked, showDelta:el('show-delta').checked, showAcoustic:el('show-acoustic').checked });
+    }
     const slopeText = s => s==='LR4'? 'LR4（24 dB/oct）': s==='LR2'? 'LR2（12 dB/oct）' : s;
     const lines=[];
     lines.push('---');
     lines.push(`・システム：${system}`);
     lines.push(`・SPL基準: ${basisText}`);
-    lines.push(`・目標クロス周波数：${(fc/1000).toFixed(2)} kHz`);
+    lines.push(`・目標クロス周波数：${(fc1/1000).toFixed(2)} kHz`);
+    if (is3way) {
+      lines.push(`・LP（Woofer）：${wz}Ω、能率${wspl.toFixed(1)}dB、特性${slopeText(wtype)}`);
+      lines.push(`・Mid（Mid-range）：${mz}Ω、能率${mspl.toFixed(1)}dB、特性${slopeText(mtype)}`);
+      lines.push(`・HP（Tweeter）：${tz}Ω、能率${tspl.toFixed(1)}dB、特性${slopeText(ttype)}`);
+      lines.push(`・クロス周波数：fc1=${(fc1/1000).toFixed(2)}kHz (Mid-High), fc2=${(fc2/1000).toFixed(2)}kHz (Low-Mid)`);
+      lines.push(`・Zobel（Woofer補正）：${zbl? '使用（ON）':'未使用（OFF）'}`);
+      lines.push(`・L-pad（Mid減衰）：${mlpadMode==='auto'? '約−'+mneedAtt.toFixed(1)+' dB（定インピ）':'OFF'}`);
+      lines.push(`・L-pad（Tweeter減衰）：${lpadMode==='auto'? '約−'+needAtt.toFixed(1)+' dB（定インピ）':'OFF'}`);
+    } else {
     lines.push(`・HP（Tweeter）：${tz}Ω、能率${tspl.toFixed(1)}dB、特性${slopeText(ttype)}`);
     lines.push(`・LP（Woofer）：${wz}Ω、能率${wspl.toFixed(1)}dB、特性${slopeText(wtype)}`);
     lines.push(`・Zobel（Woofer補正）：${zbl? '使用（ON）':'未使用（OFF）'}`);
     lines.push(`・L-pad（Tweeter減衰）：${lpadMode==='auto'? '約−'+needAtt.toFixed(1)+' dB（定インピ）':'OFF'}`);
+    }
     lines.push('---\n');
     
     // 警告・バリデーション
-    const warnings = validateDesign(wtype, ttype, fc, wspl, tspl, systemSPL, needAtt);
+    const warnings = validateDesign(wtype, ttype, fc1, wspl, tspl, systemSPL, needAtt);
     if (warnings.length > 0) {
       lines.push('■ 警告・注意事項');
       warnings.forEach(warning => lines.push(`⚠️ ${warning}`));
       lines.push('');
     }
     
-    // 自動極性判定（既に計算済み）
-    lines.push(`■ 配線順（概略）:   HP（Tweeter） ${slopeText(ttype)}  ｜  LP（Woofer） ${slopeText(wtype)}`);
-    lines.push(`極性判定: ${polarityInfo.polarity === 'invert' ? 'ツイーター反転推奨' : '同相推奨'} (${polarityInfo.reason})`);
-    lines.push(`位相差: HP ${polarityInfo.tweeterPhase}° / LP ${polarityInfo.wooferPhase}° (差: ${polarityInfo.phaseDiff}°)`);
-    
-    const hpWire=wiringForHP(ttype); const lpw=wiringForLP(wtype);
-    const polarityMark = polarityInfo.polarity === 'invert' ? ' [反転] ※ユニット端子で＋/−を入れ替える' : '';
-    lines.push(formatWiringLine('[入力(＋)] → HP：', hpWire, ` → L-pad(Rs→Rp) → Tweeter(＋)${polarityMark}`));
+    if (is3way) {
+      // 3-way配線順
+      lines.push(`■ 配線順（概略）:   LP（Woofer） ${slopeText(wtype)}  ｜  Mid（Mid-range） ${slopeText(mtype)}  ｜  HP（Tweeter） ${slopeText(ttype)}`);
+      lines.push(`クロス周波数: fc1=${(fc1/1000).toFixed(2)}kHz (Mid-High), fc2=${(fc2/1000).toFixed(2)}kHz (Low-Mid)`);
+      
+      const lpw=wiringForLP(wtype); const midWire=wiringForLP(mtype).concat(wiringForHP(mtype)); const hpWire=wiringForHP(ttype);
+      const tPolarityMark = ' [反転] ※ユニット端子で＋/−を入れ替える'; // 3-wayでは簡略化
+      const mPolarityMark = ' [反転] ※ユニット端子で＋/−を入れ替える';
+      
+      lines.push(formatWiringLine('[入力(＋)] → LP：', lpw, ' → Woofer(＋) ／ Woofer端子＋−間に [Rz−Cz直列] を並列（Zobel）'));
+      lines.push(formatWiringLine('           → Mid：', midWire, ` → L-pad(Rs→Rp) → Mid-range(＋)${mPolarityMark}`));
+      lines.push(formatWiringLine('           → HP：', hpWire, ` → L-pad(Rs→Rp) → Tweeter(＋)${tPolarityMark}`));
+      lines.push('[入力(−)] → Woofer(−), Mid-range(−), Tweeter(−)\n');
+      
+      // Mid L-pad
+      lines.push('■ L-pad（Mid-range減衰）');
+      if (mlpadMode==='auto'){
+        lines.push(`必要減衰: ${mneedAtt.toFixed(2)} dB`);
+        lines.push(`理論 Rs: ${fmtOhm(mlp.Rs)}, Rp: ${fmtOhm(mlp.Rp)}, 入力Z: ${fmtOhm(mlp.Zin)}`);
+        
+        const mRsOptimal = findOptimalResistorCombination(mlp.Rs);
+        const mRpOptimal = findOptimalResistorCombination(mlp.Rp);
+        
+        lines.push(`実用 Rs: ${formatResistorCombination(mRsOptimal)}`);
+        lines.push(`実用 Rp: ${formatResistorCombination(mRpOptimal)}`);
+        lines.push(`スナップ後 入力Z: ${fmtOhm(mlp.Zin)}`);
+      } else { 
+        lines.push('未適用'); 
+      }
+      lines.push('');
+      
+    } else {
+      // 2-way配線順（既存ロジック）
+      const polarityInfo = autoPolarity(wtype, ttype, fc1, lpadMode==='auto'? needAtt:0, 0);
+      lines.push(`■ 配線順（概略）:   HP（Tweeter） ${slopeText(ttype)}  ｜  LP（Woofer） ${slopeText(wtype)}`);
+      lines.push(`極性判定: ${polarityInfo.polarity === 'invert' ? 'ツイーター反転推奨' : '同相推奨'} (${polarityInfo.reason})`);
+      lines.push(`位相差: HP ${polarityInfo.tweeterPhase}° / LP ${polarityInfo.wooferPhase}° (差: ${polarityInfo.phaseDiff}°)`);
+      
+      const hpWire=wiringForHP(ttype); const lpw=wiringForLP(wtype);
+      const polarityMark = polarityInfo.polarity === 'invert' ? ' [反転] ※ユニット端子で＋/−を入れ替える' : '';
+      lines.push(formatWiringLine('[入力(＋)] → HP：', hpWire, ` → L-pad(Rs→Rp) → Tweeter(＋)${polarityMark}`));
     lines.push(formatWiringLine('           → LP：', lpw, ' → Woofer(＋) ／ Woofer端子＋−間に [Rz−Cz直列] を並列（Zobel）'));
     lines.push('[入力(−)] → Tweeter(−), Woofer(−)\n');
+    }
+    
+    // Tweeter L-pad（2-way/3-way共通）
     lines.push('■ L-pad（ツイーター減衰）');
     if (lpadMode==='auto'){
       lines.push(`必要減衰: ${needAtt.toFixed(2)} dB`);
@@ -646,71 +794,145 @@
       return { note: '未対応' };
     }
     
-    const hpPartsVals = calcFilterComponents(ttype, tz, fc, true);
-    const lpPartsVals = calcFilterComponents(wtype, wz, fc, false);
+    if (is3way) {
+      // 3-way素子値計算
+      const lpPartsVals = calcFilterComponents(wtype, wz, fc2, false); // Low-Mid crossover
+      const midLpPartsVals = calcFilterComponents(mtype, mz, fc1, false); // Mid-High crossover (LP部分)
+      const midHpPartsVals = calcFilterComponents(mtype, mz, fc2, true); // Low-Mid crossover (HP部分)
+      const hpPartsVals = calcFilterComponents(ttype, tz, fc1, true); // Mid-High crossover
+      
+      lines.push('■ LP（Woofer）素子値（理論）');
+      if(lpPartsVals.L1 !== undefined) {
+        if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
+          lines.push(`L(series)：${fmtInd(lpPartsVals.L1)}`);
+        } else {
+          lines.push(`L1(series)：${fmtInd(lpPartsVals.L1)}`);
+        }
+      }
+      if(lpPartsVals.C1 !== undefined) {
+        if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
+          lines.push(`C(shunt)：${fmtCap(lpPartsVals.C1)}`);
+        } else {
+          lines.push(`C1(shunt)：${fmtCap(lpPartsVals.C1)}`);
+        }
+      }
+      if(lpPartsVals.L2 !== undefined) lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}`);
+      if(lpPartsVals.C2 !== undefined) lines.push(`C2(shunt)：${fmtCap(lpPartsVals.C2)}`);
+      lines.push(`  （${lpPartsVals.note}）\n`);
+      
+      lines.push('■ Mid（Mid-range）素子値（理論）');
+      lines.push('Low-Mid crossover (HP部分):');
+      if(midHpPartsVals.C1 !== undefined) {
+        if(mtype === 'LR2' || mtype === 'Butterworth' || mtype === 'Bessel') {
+          lines.push(`C(series)：${fmtCap(midHpPartsVals.C1)}`);
+        } else {
+          lines.push(`C1(series)：${fmtCap(midHpPartsVals.C1)}`);
+        }
+      }
+      if(midHpPartsVals.L1 !== undefined) {
+        if(mtype === 'LR2' || mtype === 'Butterworth' || mtype === 'Bessel') {
+          lines.push(`L(shunt)：${fmtInd(midHpPartsVals.L1)}`);
+        } else {
+          lines.push(`L1(shunt)：${fmtInd(midHpPartsVals.L1)}`);
+        }
+      }
+      if(midHpPartsVals.C2 !== undefined) lines.push(`C2(series)：${fmtCap(midHpPartsVals.C2)}`);
+      if(midHpPartsVals.L2 !== undefined) lines.push(`L2(shunt)：${fmtInd(midHpPartsVals.L2)}`);
+      lines.push(`  （${midHpPartsVals.note}）`);
+      
+      lines.push('Mid-High crossover (LP部分):');
+      if(midLpPartsVals.L1 !== undefined) {
+        if(mtype === 'LR2' || mtype === 'Butterworth' || mtype === 'Bessel') {
+          lines.push(`L(series)：${fmtInd(midLpPartsVals.L1)}`);
+        } else {
+          lines.push(`L1(series)：${fmtInd(midLpPartsVals.L1)}`);
+        }
+      }
+      if(midLpPartsVals.C1 !== undefined) {
+        if(mtype === 'LR2' || mtype === 'Butterworth' || mtype === 'Bessel') {
+          lines.push(`C(shunt)：${fmtCap(midLpPartsVals.C1)}`);
+        } else {
+          lines.push(`C1(shunt)：${fmtCap(midLpPartsVals.C1)}`);
+        }
+      }
+      if(midLpPartsVals.L2 !== undefined) lines.push(`L2(series)：${fmtInd(midLpPartsVals.L2)}`);
+      if(midLpPartsVals.C2 !== undefined) lines.push(`C2(shunt)：${fmtCap(midLpPartsVals.C2)}`);
+      lines.push(`  （${midLpPartsVals.note}）\n`);
+      
+    } else {
+      // 2-way素子値計算（既存ロジック）
+      const hpPartsVals = calcFilterComponents(ttype, tz, fc1, true);
+      const lpPartsVals = calcFilterComponents(wtype, wz, fc1, false);
+      
+      lines.push('■ HP（Tweeter）素子値（理論）');
+      if(hpPartsVals.C1 !== undefined) {
+        if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
+          lines.push(`C(series)：${fmtCap(hpPartsVals.C1)}`);
+        } else {
+          lines.push(`C1(series)：${fmtCap(hpPartsVals.C1)}`);
+        }
+      }
+      if(hpPartsVals.L1 !== undefined) {
+        if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
+          lines.push(`L(shunt)：${fmtInd(hpPartsVals.L1)}`);
+        } else {
+          lines.push(`L1(shunt)：${fmtInd(hpPartsVals.L1)}`);
+        }
+      }
+      if(hpPartsVals.C2 !== undefined) {
+        if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
+          lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}`);
+        } else {
+          lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}`);
+        }
+      }
+      if(hpPartsVals.L2 !== undefined) {
+        if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
+          lines.push(`L(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
+        } else {
+          lines.push(`L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
+        }
+      }
+      lines.push('');
+      
+      lines.push('■ LP（Woofer）素子値（理論）');
+      if(lpPartsVals.L1 !== undefined) {
+        if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
+          lines.push(`L(series)：${fmtInd(lpPartsVals.L1)}`);
+        } else {
+          lines.push(`L1(series)：${fmtInd(lpPartsVals.L1)}`);
+        }
+      }
+      if(lpPartsVals.C1 !== undefined) {
+        if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
+          lines.push(`C(shunt)：${fmtCap(lpPartsVals.C1)}`);
+        } else {
+          lines.push(`C1(shunt)：${fmtCap(lpPartsVals.C1)}`);
+        }
+      }
+      if(lpPartsVals.C2 !== undefined) {
+        if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
+          lines.push(`C(shunt)：${fmtCap(lpPartsVals.C2)}`);
+        } else {
+          lines.push(`C2(shunt)：${fmtCap(lpPartsVals.C2)}`);
+        }
+      }
+      if(lpPartsVals.L2 !== undefined) {
+        if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
+          lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  （${lpPartsVals.note}）`);
+        } else {
+          lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  （${lpPartsVals.note}）`);
+        }
+      }
+    }
     
-    lines.push('■ HP（Tweeter）素子値（理論）');
-    if(hpPartsVals.C1 !== undefined) {
-      if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
-        lines.push(`C(series)：${fmtCap(hpPartsVals.C1)}`);
-      } else {
-        lines.push(`C1(series)：${fmtCap(hpPartsVals.C1)}`);
-      }
-    }
-    if(hpPartsVals.L1 !== undefined) {
-      if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
-        lines.push(`L(shunt)：${fmtInd(hpPartsVals.L1)}`);
-      } else {
-        lines.push(`L1(shunt)：${fmtInd(hpPartsVals.L1)}`);
-      }
-    }
-    if(hpPartsVals.C2 !== undefined) {
-      if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
-        lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}`);
-      } else {
-        lines.push(`C2(series)：${fmtCap(hpPartsVals.C2)}`);
-      }
-    }
-    if(hpPartsVals.L2 !== undefined) {
-      if(ttype === 'LR2' || ttype === 'Butterworth' || ttype === 'Bessel') {
-        lines.push(`L(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
-      } else {
-        lines.push(`L2(shunt)：${fmtInd(hpPartsVals.L2)}  （${hpPartsVals.note}）`);
-      }
-    }
-    lines.push('');
-    lines.push('■ LP（Woofer）素子値（理論）');
-    if(lpPartsVals.L1 !== undefined) {
-      if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
-        lines.push(`L(series)：${fmtInd(lpPartsVals.L1)}`);
-      } else {
-        lines.push(`L1(series)：${fmtInd(lpPartsVals.L1)}`);
-      }
-    }
-    if(lpPartsVals.C1 !== undefined) {
-      if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
-        lines.push(`C(shunt)：${fmtCap(lpPartsVals.C1)}`);
-      } else {
-        lines.push(`C1(shunt)：${fmtCap(lpPartsVals.C1)}`);
-      }
-    }
-    if(lpPartsVals.C2 !== undefined) {
-      if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
-        lines.push(`C(shunt)：${fmtCap(lpPartsVals.C2)}`);
-      } else {
-        lines.push(`C2(shunt)：${fmtCap(lpPartsVals.C2)}`);
-      }
-    }
-    if(lpPartsVals.L2 !== undefined) {
-      if(wtype === 'LR2' || wtype === 'Butterworth' || wtype === 'Bessel') {
-        lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  （${lpPartsVals.note}）`);
-      } else {
-        lines.push(`L2(series)：${fmtInd(lpPartsVals.L2)}  （${lpPartsVals.note}）`);
-      }
-    }
     el('results').textContent = lines.join('\n');
   }
-  ['show-woo','show-twe','show-sum','show-snapped','show-delta','show-acoustic','show-imp'].forEach(function(id){ el(id).addEventListener('change', run); });
+  
+  // グラフトグルイベントリスナー
+  ['show-woo','show-mid','show-twe','show-sum','show-snapped','show-delta','show-acoustic','show-imp'].forEach(function(id){ 
+    if (el(id)) el(id).addEventListener('change', run); 
+  });
   el('calc').addEventListener('click', run);
   
   // Markdownエクスポート機能
@@ -772,6 +994,29 @@ ${cleanCalculationResults}
     URL.revokeObjectURL(url);
   });
   
+  // システム選択によるUI切り替え
+  function toggleSystemUI() {
+    const system = el('system').value;
+    const is3way = system === '3way';
+    
+    // Mid-rangeセクションの表示/非表示
+    el('mid-section').style.display = is3way ? 'block' : 'none';
+    el('mid-row').style.display = is3way ? 'block' : 'none';
+    
+    // クロス周波数2の表示/非表示
+    el('fc2-wrap').style.display = is3way ? 'block' : 'none';
+    
+    // グラフトグルの表示/非表示
+    el('show-mid-label').style.display = is3way ? 'block' : 'none';
+    el('show-snapped-label').style.display = is3way ? 'none' : 'block';
+    el('show-delta-label').style.display = is3way ? 'none' : 'block';
+    
+    // ラベル更新
+    el('fc1').placeholder = is3way ? '3-way: fc1 (Mid-High)' : '2-way: fc1';
+  }
+  
+  el('system').addEventListener('change', toggleSystemUI);
+  
   // テストケース読み込み機能
   el('load-testcase').addEventListener('click', function() {
     // ユーザー提供のテストケース: 2-way, Woofer 8Ω/90dB, Tweeter 8Ω/98dB, Crossover 1800Hz, Tweeter LR4, Woofer LR2
@@ -780,13 +1025,16 @@ ${cleanCalculationResults}
     el('wspl').value = '90';
     el('tz').value = '8';
     el('tspl').value = '98';
-    el('fc').value = '1800';
+    el('fc1').value = '1800';
     el('wtype').value = 'LR2';
     el('ttype').value = 'LR4';
     el('spl-basis').value = 'minEfficiency';
     el('target-spl').value = '';
     el('wzobel').value = 'on';
     el('tlpad').value = 'auto';
+    
+    // UI更新
+    toggleSystemUI();
     
     // 計算を実行
     run();
@@ -798,8 +1046,8 @@ ${cleanCalculationResults}
 <!-- バージョン情報 -->
 <div style="text-align: center; margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-radius: 5px; font-size: 12px; color: #666;">
   <strong>Speaker Network Calculator</strong><br>
-  バージョン: 2.1.0 (高度な極性判定アルゴリズム実装)<br>
-  最終更新: 2025-09-28 10:57<br>
+  バージョン: 2.2.0 (3-Wayシステム対応実装)<br>
+  最終更新: 2025-09-28 11:35<br>
   <a href="https://github.com/ginbourbonwhisky/peaker-xover" target="_blank" style="color: #0066cc;">GitHub Repository</a>
 </div>
 
