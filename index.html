@@ -404,6 +404,48 @@
     const acoustic = driverAcousticResponse(f, 'tweeter');
     return electrical * acoustic;
   }
+  
+  // 警告・バリデーション機能
+  function validateDesign(wooferType, tweeterType, fc, wspl, tspl, systemSPL, needAtt) {
+    const warnings = [];
+    
+    // 1. クロス周波数の妥当性チェック
+    if (fc < 500) {
+      warnings.push('クロス周波数が低すぎます（500Hz未満）。ツイーターの低域限界を考慮してください。');
+    } else if (fc > 5000) {
+      warnings.push('クロス周波数が高すぎます（5kHz超）。ウーファーの高域限界を考慮してください。');
+    }
+    
+    // 2. SPL差のチェック
+    const splDiff = Math.abs(tspl - wspl);
+    if (splDiff > 10) {
+      warnings.push(`SPL差が大きすぎます（${splDiff.toFixed(1)}dB）。L-pad減衰が大きくなり効率が低下します。`);
+    }
+    
+    // 3. L-pad減衰のチェック
+    if (needAtt > 12) {
+      warnings.push(`L-pad減衰が大きすぎます（${needAtt.toFixed(1)}dB）。ツイーターの効率が大幅に低下します。`);
+    } else if (needAtt > 6) {
+      warnings.push(`L-pad減衰が大きめです（${needAtt.toFixed(1)}dB）。ツイーターの効率低下に注意してください。`);
+    }
+    
+    // 4. フィルタ特性の組み合わせチェック
+    if (wooferType === 'Butterworth' && tweeterType === 'Butterworth') {
+      warnings.push('Butterworth同士の組み合わせは位相特性によりディップやピークが生じやすいです。測定での調整を推奨します。');
+    }
+    
+    // 5. システムSPLの妥当性チェック
+    if (systemSPL < 80) {
+      warnings.push('システムSPLが低めです（80dB未満）。十分な音量が得られない可能性があります。');
+    } else if (systemSPL > 100) {
+      warnings.push('システムSPLが高めです（100dB超）。実現可能性を確認してください。');
+    }
+    
+    // 6. インピーダンスのチェック
+    // 注：現在は8Ω固定だが、将来的に可変になった場合の準備
+    
+    return warnings;
+  }
   function genFreq(){const arr=[];for(let p=Math.log10(20);p<=Math.log10(40000);p+=0.02){arr.push(10**p)}return arr}
   function wiringForHP(type){if(type==='LR4')return['C1(series)','L1(shunt)','C2(series)','L2(shunt)'];return['C(series)','L(shunt)']}
   function wiringForLP(type){if(type==='LR4')return['L1(series)','C1(shunt)','L2(series)','C2(shunt)'];return['L(series)','C(shunt)']}
@@ -494,6 +536,14 @@
     lines.push(`・Zobel（Woofer補正）：${zbl? '使用（ON）':'未使用（OFF）'}`);
     lines.push(`・L-pad（Tweeter減衰）：${lpadMode==='auto'? '約−'+needAtt.toFixed(1)+' dB（定インピ）':'OFF'}`);
     lines.push('---\n');
+    
+    // 警告・バリデーション
+    const warnings = validateDesign(wtype, ttype, fc, wspl, tspl, systemSPL, needAtt);
+    if (warnings.length > 0) {
+      lines.push('■ 警告・注意事項');
+      warnings.forEach(warning => lines.push(`⚠️ ${warning}`));
+      lines.push('');
+    }
     
     // 自動極性判定（既に計算済み）
     lines.push(`■ 配線順（概略）:   HP（Tweeter） ${slopeText(ttype)}  ｜  LP（Woofer） ${slopeText(wtype)}`);
@@ -749,7 +799,7 @@ ${cleanCalculationResults}
 <div style="text-align: center; margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-radius: 5px; font-size: 12px; color: #666;">
   <strong>Speaker Network Calculator</strong><br>
   バージョン: 2.1.0 (高度な極性判定アルゴリズム実装)<br>
-  最終更新: 2025-09-28 10:54<br>
+  最終更新: 2025-09-28 10:57<br>
   <a href="https://github.com/ginbourbonwhisky/peaker-xover" target="_blank" style="color: #0066cc;">GitHub Repository</a>
 </div>
 
