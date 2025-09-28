@@ -160,11 +160,14 @@
   // 複素数クラス（簡易版）
   class Complex {
     constructor(real, imag) {
-      this.real = real;
-      this.imag = imag;
+      this.real = real || 0;
+      this.imag = imag || 0;
     }
     
     add(other) {
+      if (typeof other === 'number') {
+        return new Complex(this.real + other, this.imag);
+      }
       return new Complex(this.real + other.real, this.imag + other.imag);
     }
     
@@ -183,6 +186,7 @@
         return new Complex(this.real / other, this.imag / other);
       }
       const denom = other.real * other.real + other.imag * other.imag;
+      if (denom === 0) return new Complex(0, 0);
       return new Complex(
         (this.real * other.real + this.imag * other.imag) / denom,
         (this.imag * other.real - this.real * other.imag) / denom
@@ -681,4 +685,13 @@ ${cleanCalculationResults}
   
   run();
 </script>
+
+<!-- バージョン情報 -->
+<div style="text-align: center; margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-radius: 5px; font-size: 12px; color: #666;">
+  <strong>Speaker Network Calculator</strong><br>
+  バージョン: 2.1.0 (高度な極性判定アルゴリズム実装)<br>
+  最終更新: 2025年1月28日<br>
+  <a href="https://github.com/ginbourbonwhisky/peaker-xover" target="_blank" style="color: #0066cc;">GitHub Repository</a>
+</div>
+
 </html>
