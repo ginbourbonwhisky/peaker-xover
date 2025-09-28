@@ -73,6 +73,7 @@
     <label><input type="checkbox" id="show-sum" checked> Sum</label>
     <label><input type="checkbox" id="show-snapped" checked> スナップ後（実用値）</label>
     <label><input type="checkbox" id="show-delta"> 差分（理想−スナップ後）</label>
+    <label><input type="checkbox" id="show-acoustic"> 音響合成</label>
     <label><input type="checkbox" id="show-imp" checked> インピーダンスZ</label>
   </fieldset>
 </div>
@@ -331,6 +332,38 @@
     if(type==='Bessel') return { Q:0.577, order:2, note:'Bessel 2次' };
     return { Q:0.5, order:2, note:'デフォルト' };
   }
+  // 簡易音響モデル（ドライバの帯域外特性）
+  function driverAcousticResponse(f, driverType) {
+    if (driverType === 'woofer') {
+      // ウーファー: 高域ロールオフ + 低域共振
+      const f_high = 3000; // 高域ロールオフ開始周波数
+      const f_low = 50;    // 低域共振周波数
+      const Q_low = 0.7;   // 低域共振Q値
+      
+      // 高域ロールオフ（2次）
+      const highRolloff = f > f_high ? 1 / Math.sqrt(1 + Math.pow(f / f_high, 4)) : 1;
+      
+      // 低域共振（2次）
+      const lowResonance = f < f_low ? 1 / Math.sqrt(1 + Math.pow(f_low / f, 4) + 2 * Math.pow(f_low / f, 2) * (2 * Q_low * Q_low - 1)) : 1;
+      
+      return highRolloff * lowResonance;
+    } else if (driverType === 'tweeter') {
+      // ツイーター: 低域ロールオフ + 高域共振
+      const f_low = 800;   // 低域ロールオフ開始周波数
+      const f_high = 20000; // 高域共振周波数
+      const Q_high = 0.5;   // 高域共振Q値
+      
+      // 低域ロールオフ（2次）
+      const lowRolloff = f < f_low ? 1 / Math.sqrt(1 + Math.pow(f_low / f, 4)) : 1;
+      
+      // 高域共振（2次）
+      const highResonance = f > f_high ? 1 / Math.sqrt(1 + Math.pow(f / f_high, 4) + 2 * Math.pow(f / f_high, 2) * (2 * Q_high * Q_high - 1)) : 1;
+      
+      return lowRolloff * highResonance;
+    }
+    return 1; // デフォルト
+  }
+  
   function magLP(type,f,fc){
     const x=f/fc;
     const coeffs = getFilterCoeffs(type);
@@ -358,6 +391,19 @@
     }
     return 1/Math.sqrt(1+x*x);
   }
+  
+  // 音響合成（電気フィルタ + ドライバ音響特性）
+  function acousticResponseLP(type, f, fc) {
+    const electrical = magLP(type, f, fc);
+    const acoustic = driverAcousticResponse(f, 'woofer');
+    return electrical * acoustic;
+  }
+  
+  function acousticResponseHP(type, f, fc) {
+    const electrical = magHP(type, f, fc);
+    const acoustic = driverAcousticResponse(f, 'tweeter');
+    return electrical * acoustic;
+  }
   function genFreq(){const arr=[];for(let p=Math.log10(20);p<=Math.log10(40000);p+=0.02){arr.push(10**p)}return arr}
   function wiringForHP(type){if(type==='LR4')return['C1(series)','L1(shunt)','C2(series)','L2(shunt)'];return['C(series)','L(shunt)']}
   function wiringForLP(type){if(type==='LR4')return['L1(series)','C1(shunt)','L2(series)','C2(shunt)'];return['L(series)','C(shunt)']}
@@ -376,6 +422,10 @@
       if(toggles.showSum)ds.push({label:'Sum（スナップ後）',data:series.sumSnap,borderColor:'#666',pointRadius:0,borderDash:[4,2]});
     }
     if(toggles.showDelta){ ds.push({label:'差分（理想−スナップ後）',data:series.delta,borderColor:'#0b6',pointRadius:0,borderDash:[2,4]}); }
+    if(toggles.showAcoustic){
+      if(toggles.showWoo)ds.push({label:'Woofer（音響合成）',data:series.wAcoustic,borderColor:'#a33',pointRadius:0,borderDash:[8,4]});
+      if(toggles.showTwe)ds.push({label:'Tweeter（音響合成）',data:series.tAcoustic,borderColor:'#33a',pointRadius:0,borderDash:[8,4]});
+    }
     chart=new Chart(ctx,{
       type:'line',
       data:{ labels:freq, datasets:ds },
@@ -412,18 +462,27 @@
     const freq=genFreq();
     const wMag=freq.map(f=> magLP(wtype,f,fc));
     const tMagIdeal=freq.map(f=> magHP(ttype,f,fc));
+    
+    // 音響合成（電気フィルタ + ドライバ音響特性）
+    const wAcousticMag=freq.map(f=> acousticResponseLP(wtype,f,fc));
+    const tAcousticMag=freq.map(f=> acousticResponseHP(ttype,f,fc));
+    
     // L-pad減衰はdB側で適用（二重適用防止のため振幅には掛けない）
     const tMag=tMagIdeal;
     const wIdealDb=wMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
     const tIdealDb=tMagIdeal.map(m=> ratioToDb(m) + (tspl-systemSPL));
     const tSnapDb=tMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - (lpadMode==='auto'? needAtt:0));
+    
+    // 音響合成のdB値
+    const wAcousticDb=wAcousticMag.map(m=> ratioToDb(m) + (wspl-systemSPL));
+    const tAcousticDb=tAcousticMag.map(m=> ratioToDb(m) + (tspl-systemSPL) - (lpadMode==='auto'? needAtt:0));
     const polarityInfo = autoPolarity(wtype, ttype, fc, lpadMode==='auto'? needAtt:0, 0);
     const invert = (polarityInfo.polarity === 'invert');
     function sumDb(aDb,bDb,inv){ const a=dbToRatio(aDb), b=dbToRatio(bDb)*(inv?-1:1); const mag=Math.sqrt(Math.max(0,a*a+b*b)); return ratioToDb(mag); }
     const sumIdealDb=freq.map((_,i)=> sumDb(wIdealDb[i], tIdealDb[i], invert));
     const sumSnapDb=freq.map((_,i)=> sumDb(wIdealDb[i], tSnapDb[i], invert));
     const deltaDb=freq.map((_,i)=> sumIdealDb[i]-sumSnapDb[i]);
-    draw2Way(freq,{ wIdeal:wIdealDb, tIdeal:tIdealDb, sumIdeal:sumIdealDb, wSnap:wIdealDb, tSnap:tSnapDb, sumSnap:sumSnapDb, delta:deltaDb },{ showWoo:el('show-woo').checked, showTwe:el('show-twe').checked, showSum:el('show-sum').checked, showSnapped:el('show-snapped').checked, showDelta:el('show-delta').checked });
+    draw2Way(freq,{ wIdeal:wIdealDb, tIdeal:tIdealDb, sumIdeal:sumIdealDb, wSnap:wIdealDb, tSnap:tSnapDb, sumSnap:sumSnapDb, delta:deltaDb, wAcoustic:wAcousticDb, tAcoustic:tAcousticDb },{ showWoo:el('show-woo').checked, showTwe:el('show-twe').checked, showSum:el('show-sum').checked, showSnapped:el('show-snapped').checked, showDelta:el('show-delta').checked, showAcoustic:el('show-acoustic').checked });
     const slopeText = s => s==='LR4'? 'LR4（24 dB/oct）': s==='LR2'? 'LR2（12 dB/oct）' : s;
     const lines=[];
     lines.push('---');
@@ -601,7 +660,7 @@
     }
     el('results').textContent = lines.join('\n');
   }
-  ['show-woo','show-twe','show-sum','show-snapped','show-delta','show-imp'].forEach(function(id){ el(id).addEventListener('change', run); });
+  ['show-woo','show-twe','show-sum','show-snapped','show-delta','show-acoustic','show-imp'].forEach(function(id){ el(id).addEventListener('change', run); });
   el('calc').addEventListener('click', run);
   
   // Markdownエクスポート機能
