@@ -1018,6 +1018,9 @@ ${cleanCalculationResults}
   
   el('system').addEventListener('change', toggleSystemUI);
   
+  // 初期化時にUI状態を設定
+  toggleSystemUI();
+  
   // テストケース読み込み機能
   el('load-testcase').addEventListener('click', function() {
     // ユーザー提供のテストケース: 2-way, Woofer 8Ω/90dB, Tweeter 8Ω/98dB, Crossover 1800Hz, Tweeter LR4, Woofer LR2
@@ -1048,7 +1051,7 @@ ${cleanCalculationResults}
 <div style="text-align: center; margin-top: 20px; padding: 10px; background-color: #f5f5f5; border-radius: 5px; font-size: 12px; color: #666;">
   <strong>Speaker Network Calculator</strong><br>
   バージョン: 2.2.0 (3-Wayシステム対応実装)<br>
-  最終更新: 2025-09-28 11:42<br>
+  最終更新: 2025-09-28 11:44<br>
   <a href="https://github.com/ginbourbonwhisky/peaker-xover" target="_blank" style="color: #0066cc;">GitHub Repository</a>
 </div>
 
