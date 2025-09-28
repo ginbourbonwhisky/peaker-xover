@@ -442,7 +442,7 @@
     lines.push(`位相差: HP ${polarityInfo.tweeterPhase}° / LP ${polarityInfo.wooferPhase}° (差: ${polarityInfo.phaseDiff}°)`);
     
     const hpWire=wiringForHP(ttype); const lpw=wiringForLP(wtype);
-    const polarityMark = polarityInfo.polarity === 'invert' ? ' [反転]' : '';
+    const polarityMark = polarityInfo.polarity === 'invert' ? ' [反転] ※ユニット端子で＋/−を入れ替える' : '';
     lines.push(formatWiringLine('[入力(＋)] → HP：', hpWire, ` → L-pad(Rs→Rp) → Tweeter(＋)${polarityMark}`));
     lines.push(formatWiringLine('           → LP：', lpw, ' → Woofer(＋) ／ Woofer端子＋−間に [Rz−Cz直列] を並列（Zobel）'));
     lines.push('[入力(−)] → Tweeter(−), Woofer(−)\n');
